@@ -238,6 +238,44 @@
   .gradient-bar{ width:140px; height:8px; border-radius:4px; background:linear-gradient(90deg, #5b8a9a, #e8a04c, #d9534f); margin-bottom:4px; }
   .gradient-labels{ display:flex; justify-content:space-between; color:var(--cream); opacity:0.8; }
 
+  /* ===== Compact map theme picker ===== */
+  .theme-picker{
+    position:absolute;
+    top:18px;
+    left:18px;
+    z-index:1000;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    padding:7px;
+    border-radius:999px;
+    background:rgba(26,35,50,0.72);
+    border:1px solid rgba(232,160,76,0.25);
+    backdrop-filter:blur(8px);
+    box-shadow:0 4px 18px rgba(0,0,0,0.22);
+  }
+  .theme-dot{
+    width:22px;
+    height:22px;
+    border-radius:999px;
+    border:2px solid rgba(245,240,230,0.45);
+    cursor:pointer;
+    transition:transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .theme-dot:hover{ transform:scale(1.12); }
+  .theme-dot.active{
+    border-color:var(--amber);
+    box-shadow:0 0 0 3px rgba(232,160,76,0.28);
+  }
+  .theme-dot-dark{ background:#1a2332; }
+  .theme-dot-white{ background:#f5f0e6; border-color:rgba(26,35,50,0.35); }
+  .theme-dot-night{ background:#44515e; }
+
+  body[data-map-theme="white"] .theme-picker{
+    background:rgba(245,240,230,0.72);
+    border-color:rgba(26,35,50,0.18);
+  }
+
   /* ===== Panel controls ===== */
   .panel-actions{
     margin-left:auto;
@@ -308,6 +346,8 @@
     }
     .readouts{grid-template-columns:repeat(3,1fr); gap:10px;}
     .legend{ top:auto; bottom:64px; right:12px; left:12px; }
+    .theme-picker{ top:12px; left:12px; padding:6px; gap:6px; }
+    .theme-dot{ width:20px; height:20px; }
     .scrubber-wrap{
       left:50%;
       right:auto;
@@ -620,7 +660,7 @@
 
 </style>
 </head>
-<body>
+<body data-map-theme="dark">
 
 <header>
   <div class="eyebrow">Flight Track Viewer</div>
@@ -659,6 +699,11 @@
 
 <main class="view active" id="viewer-view">
   <div id="map"></div>
+  <div class="theme-picker" id="theme-picker" aria-label="Map theme">
+    <button class="theme-dot theme-dot-dark active" type="button" data-theme="dark" title="Original dark map" aria-label="Original dark map" aria-pressed="true"></button>
+    <button class="theme-dot theme-dot-white" type="button" data-theme="white" title="White map" aria-label="White map" aria-pressed="false"></button>
+    <button class="theme-dot theme-dot-night" type="button" data-theme="night" title="Less-dark night map" aria-label="Less-dark night map" aria-pressed="false"></button>
+  </div>
 
   <div class="empty-state" id="empty-state">
     <div class="empty-inner">
@@ -793,13 +838,72 @@ let marker = null;
 let altMin = 0, altMax = 0;
 let trackBounds = null;
 
+const MAP_THEMES = {
+  dark: {
+    label: 'Original Dark',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    filter: 'saturate(0.55) brightness(0.85) contrast(1.05)',
+    mapBg: '#2a3441',
+    route: 'original'
+  },
+  white: {
+    label: 'White',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    filter: 'saturate(0.72) brightness(1.06) contrast(0.94)',
+    mapBg: '#e9e5dc',
+    route: 'bold'
+  },
+  night: {
+    label: 'Option A',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    filter: 'saturate(0.75) brightness(1.25) contrast(0.9)',
+    mapBg: '#44515e',
+    route: 'bold'
+  }
+};
+const THEME_ORDER = ['dark', 'white', 'night'];
+let currentMapTheme = 'dark';
+
 const map = L.map('map', { zoomControl: true, attributionControl: true, center:[39.8,-98.5], zoom: 4 });
 window.addEventListener('resize', () => map.invalidateSize());
 setTimeout(() => map.invalidateSize(), 100);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+const tileLayer = L.tileLayer(MAP_THEMES[currentMapTheme].url, {
   attribution: '&copy; OpenStreetMap &copy; CARTO',
   maxZoom: 18
 }).addTo(map);
+
+// ===========================================================================
+// Map themes
+// ===========================================================================
+function applyMapTheme(themeKey){
+  const theme = MAP_THEMES[themeKey] || MAP_THEMES.dark;
+  currentMapTheme = themeKey;
+  document.body.dataset.mapTheme = themeKey;
+  tileLayer.setUrl(theme.url);
+  document.querySelectorAll('.leaflet-tile-pane').forEach(el => {
+    el.style.filter = theme.filter;
+  });
+  document.getElementById('map').style.background = theme.mapBg;
+  document.querySelectorAll('.leaflet-container').forEach(el => {
+    el.style.background = theme.mapBg;
+  });
+  document.querySelectorAll('.theme-dot').forEach(btn => {
+    const isActive = btn.dataset.theme === themeKey;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+  redrawTrackSegments();
+}
+
+function cycleMapTheme(){
+  const i = THEME_ORDER.indexOf(currentMapTheme);
+  const next = THEME_ORDER[(i + 1) % THEME_ORDER.length];
+  applyMapTheme(next);
+}
+
+function currentRouteStyle(){
+  return (MAP_THEMES[currentMapTheme] || MAP_THEMES.dark).route;
+}
 
 // ===========================================================================
 // Parsers
@@ -1116,6 +1220,34 @@ function clearTrack(){
   trackBounds = null;
 }
 
+function redrawTrackSegments(){
+  polylines.forEach(p => map.removeLayer(p));
+  polylines = [];
+  if (!FLIGHT.length) return;
+
+  const style = currentRouteStyle();
+  for (let i = 0; i < FLIGHT.length - 1; i++){
+    const a = FLIGHT[i], b = FLIGHT[i+1];
+    const avgAlt = (a[2]+b[2])/2;
+    const latlngs = [[a[0],a[1]],[b[0],b[1]]];
+
+    if (style === 'bold') {
+      const casing = L.polyline(latlngs, {
+        color: '#1a2332', weight: 7, opacity: 0.55
+      }).addTo(map);
+      const line = L.polyline(latlngs, {
+        color: altColor(avgAlt), weight: 4, opacity: 0.96
+      }).addTo(map);
+      polylines.push(casing, line);
+    } else {
+      const line = L.polyline(latlngs, {
+        color: altColor(avgAlt), weight: 3, opacity: 0.85
+      }).addTo(map);
+      polylines.push(line);
+    }
+  }
+}
+
 function fitTrackToView(){
   if (!trackBounds) return;
   map.invalidateSize();
@@ -1136,16 +1268,10 @@ function renderTrack(points, tailNumber){
   document.getElementById('alt-max').textContent = Math.round(altMax);
 
   const bounds = [];
-  for (let i = 0; i < FLIGHT.length - 1; i++){
-    const a = FLIGHT[i], b = FLIGHT[i+1];
-    const avgAlt = (a[2]+b[2])/2;
-    const line = L.polyline([[a[0],a[1]],[b[0],b[1]]], {
-      color: altColor(avgAlt), weight: 3, opacity: 0.85
-    }).addTo(map);
-    polylines.push(line);
-    bounds.push([a[0],a[1]]);
+  for (let i = 0; i < FLIGHT.length; i++){
+    bounds.push([FLIGHT[i][0], FLIGHT[i][1]]);
   }
-  bounds.push([FLIGHT[FLIGHT.length-1][0], FLIGHT[FLIGHT.length-1][1]]);
+  redrawTrackSegments();
   trackBounds = L.latLngBounds(bounds);
   fitTrackToView();
 
@@ -1240,6 +1366,7 @@ const playBtn = document.getElementById('play');
 const playIcon = document.getElementById('play-icon');
 const pauseIcon = document.getElementById('pause-icon');
 const fitTrackBtn = document.getElementById('fit-track');
+const themeButtons = document.querySelectorAll('.theme-dot');
 
 function stopPlay(){
   playing = false;
@@ -1261,6 +1388,8 @@ function startPlay(){
 }
 playBtn.addEventListener('click', () => playing ? stopPlay() : startPlay());
 fitTrackBtn.addEventListener('click', fitTrackToView);
+themeButtons.forEach(btn => btn.addEventListener('click', () => applyMapTheme(btn.dataset.theme))); 
+applyMapTheme(currentMapTheme);
 
 // ===========================================================================
 // File handling
