@@ -19,7 +19,7 @@
     --red:#d9534f;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{height:100vh;font-family:'Space Mono',monospace;background:var(--navy);color:var(--cream);}
+  html,body{height:100vh;overflow:hidden;font-family:'Space Mono',monospace;background:var(--navy);color:var(--cream);}
   body{ display:flex; flex-direction:column; overflow:hidden; min-height:0; }
 
   /* ===== Header ===== */
@@ -104,6 +104,7 @@
     position:relative;
     flex:1 1 auto;
     min-height:0;
+    overflow:hidden;
   }
   #map{
     position:absolute;
