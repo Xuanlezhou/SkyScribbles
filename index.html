@@ -322,6 +322,49 @@
     padding:40px 32px;
   }
   .batch-wrap{ max-width:680px; margin:0 auto; }
+
+  .format-select{
+    margin-bottom:24px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .format-label{
+    font-size:10px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--taxiway);
+    margin-bottom:4px;
+  }
+  .format-option{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    padding:12px 16px;
+    border:1px solid var(--panel);
+    border-radius:6px;
+    cursor:pointer;
+    transition:all 0.15s ease;
+  }
+  .format-option:has(input:checked){
+    border-color:rgba(232,160,76,0.5);
+    background:rgba(232,160,76,0.06);
+  }
+  .format-option input{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+  }
+  .format-option .fo-title{
+    font-size:13px;
+    font-weight:700;
+    color:var(--cream);
+  }
+  .format-option:has(input:checked) .fo-title{ color:var(--amber); }
+  .format-option .fo-desc{
+    font-size:11px;
+    color:var(--taxiway);
+  }
   .batch-drop{
     border:2px dashed rgba(232,160,76,0.35);
     border-radius:10px;
@@ -541,12 +584,26 @@
 
 <div class="view" id="batch-view">
   <div class="batch-wrap">
+    <div class="format-select">
+      <div class="format-label">Output format</div>
+      <label class="format-option">
+        <input type="radio" name="batch-format" value="g1000" checked>
+        <span class="fo-title">ForeFlight Track Log (G1000 CSV)</span>
+        <span class="fo-desc">For importing flight history into ForeFlight's Track Logs / logbook</span>
+      </label>
+      <label class="format-option">
+        <input type="radio" name="batch-format" value="kml">
+        <span class="fo-title">Clean Custom Map (KML)</span>
+        <span class="fo-desc">A single tidy track line, no per-point labels — for ForeFlight Custom Maps</span>
+      </label>
+    </div>
+
     <label class="batch-drop" id="batch-drop">
       <svg viewBox="0 0 24 24"><path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6h2v6h10v-6h2zM12 2l5 5h-3v6h-4V7H7l5-5z"/></svg>
       <h3>Drop KML or CSV files here</h3>
-      <p>Accepts ForeFlight/Garmin KML track logs, FlightRadar24-style CSVs, or
-        G1000 CSVs (re-exporting is fine). Each file is converted to a
-        G1000-format CSV ready for ForeFlight track log import.</p>
+      <p>Accepts ForeFlight/Garmin KML track logs (including raw FlightRadar24
+        KML exports), FlightRadar24-style CSVs, or G1000 CSVs. Each file is
+        converted to the output format selected above.</p>
       <input type="file" id="batch-input" accept=".kml,.csv,.txt" multiple>
     </label>
 
@@ -582,6 +639,65 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
 // ===========================================================================
 // Parsers
 // ===========================================================================
+
+// --- Dispatches between FF-style (gx:Track) and FR24-style (per-point Placemarks) KML ---
+function parseAnyKML(text){
+  if (text.includes('<gx:Track>') || text.includes('<gx:coord>')) {
+    return parseKML(text);
+  }
+  if (text.includes('<TimeStamp>')) {
+    return parseFR24KML(text);
+  }
+  throw new Error('Could not find track data in this KML (no gx:Track or TimeStamp placemarks found).');
+}
+
+// --- FR24-style KML: thousands of per-point <Placemark> with <name> timestamp,
+//     <description> (Altitude/Speed/Heading as HTML), <TimeStamp><when>, <Point><coordinates> ---
+function parseFR24KML(text){
+  const placemarks = [...text.matchAll(/<Placemark>([\s\S]*?)<\/Placemark>/g)].map(m => m[1]);
+
+  const pts = [];
+  let tailNumber = null;
+
+  // Try to pull tail number from the Document name, e.g. "-/N445AF"
+  const docName = text.match(/<name>(.*?)<\/name>/);
+  if (docName) {
+    const m = docName[1].match(/([A-Z]\d?-?[A-Z0-9]{3,6})$/);
+    if (m) tailNumber = m[1].replace(/^-\//, '');
+  }
+
+  for (const pm of placemarks){
+    const tsMatch = pm.match(/<TimeStamp>\s*<when>(.*?)<\/when>/);
+    const coordMatch = pm.match(/<Point>[\s\S]*?<coordinates>(.*?)<\/coordinates>/);
+    if (!tsMatch || !coordMatch) continue; // skip non-point placemarks (route lines, etc.)
+
+    const iso = tsMatch[1].replace('+00:00', 'Z');
+    const [lon, lat, alt0] = coordMatch[1].split(',').map(Number);
+
+    let altFt = alt0 || 0;
+    let speed = null, course = null;
+
+    const descMatch = pm.match(/<description>([\s\S]*?)<\/description>/);
+    if (descMatch) {
+      const desc = descMatch[1];
+      const altM = desc.match(/Altitude:.*?(-?\d+(?:\.\d+)?)\s*ft/);
+      const spdM = desc.match(/Speed:.*?(-?\d+(?:\.\d+)?)\s*kt/);
+      const hdgM = desc.match(/Heading:.*?(-?\d+(?:\.\d+)?)/);
+      if (altM) altFt = parseFloat(altM[1]);
+      if (spdM) speed = parseFloat(spdM[1]);
+      if (hdgM) course = parseFloat(hdgM[1]);
+    }
+
+    pts.push([lat, lon, altFt, speed === null ? 0 : speed, course === null ? -1 : course, iso]);
+  }
+
+  if (pts.length === 0) throw new Error('No valid track points found in this FR24 KML.');
+
+  // Sort by time just in case placemarks aren't in chronological order
+  pts.sort((a,b) => new Date(a[5]) - new Date(b[5]));
+
+  return { points: pts, tailNumber };
+}
 
 // --- KML parser (gx:Track with <when> + <gx:coord>, optional speed/course arrays) ---
 function parseKML(text){
@@ -985,13 +1101,13 @@ function handleFile(file){
     try {
       let result;
       if (name.endsWith('.kml')) {
-        result = parseKML(text);
+        result = parseAnyKML(text);
       } else if (name.endsWith('.csv') || name.endsWith('.txt')) {
         result = parseCSV(text);
       } else {
         // sniff content
-        if (text.includes('<gx:coord>') || text.includes('<kml')) {
-          result = parseKML(text);
+        if (text.includes('<kml') || text.includes('<Placemark>')) {
+          result = parseAnyKML(text);
         } else {
           result = parseCSV(text);
         }
@@ -1091,9 +1207,80 @@ function toG1000CSV(points){
   return rows.join('\n');
 }
 
-// ===========================================================================
-// Batch export
-// ===========================================================================
+// Convert parsed points -> a clean ForeFlight-style KML (single gx:Track, Start placemark,
+// optional speed/course extended-data arrays, no per-point labels/icons/descriptions)
+function toCleanKML(points, tailNumber){
+  const whenCoordLines = points.map(p => {
+    const [lat, lon, altFt] = p;
+    const altM = altFt / 3.28084;
+    return `                <when>${p[5]}</when>\n                <gx:coord>${lon.toFixed(6)} ${lat.toFixed(6)} ${altM.toFixed(1)}</gx:coord>`;
+  }).join('\n                \n');
+
+  const speedValues = points.map(p => `                    <gx:value>${Math.max(0,p[3]).toFixed(2)}</gx:value>`).join('\n                    \n');
+  const courseValues = points.map(p => `                    <gx:value>${p[4].toFixed(2)}</gx:value>`).join('\n                    \n');
+
+  const first = points[0];
+  const tail = tailNumber || '';
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"  xmlns:gx="http://www.google.com/kml/ext/2.2">
+    <Document>
+        <open>1</open>
+        <visibility>1</visibility>
+
+        <Style id="trackStyle">
+            <LineStyle>
+                <color>ffDB9034</color>
+                <width>4</width>
+            </LineStyle>
+            <PolyStyle>
+                <color>80DB9034</color>
+            </PolyStyle>
+        </Style>
+
+        <Placemark>
+            <name></name>
+            <styleUrl>#trackStyle</styleUrl>
+            <gx:Track>
+                <altitudeMode>absolute</altitudeMode>
+                <extrude>1</extrude>
+                <gx:interpolate>1</gx:interpolate>
+                
+${whenCoordLines}
+                
+                <ExtendedData>
+                    <SchemaData>
+                        <gx:SimpleArrayData name="speed_kts">
+                    ${speedValues}
+                        </gx:SimpleArrayData>
+                        <gx:SimpleArrayData name="course">
+                    ${courseValues}
+                        </gx:SimpleArrayData>
+                    </SchemaData>
+                </ExtendedData>
+            </gx:Track>
+        </Placemark>
+        <Placemark>
+            <name>Start</name>
+            <Point>
+                <coordinates>${first[1].toFixed(6)},${first[0].toFixed(6)},${(first[2]/3.28084).toFixed(1)}</coordinates>
+            </Point>
+        </Placemark>
+        <ExtendedData>
+            <Data name="source">
+                <displayName>Source</displayName>
+                <value>Flight Track Viewer</value>
+            </Data>
+            <Data name="tailNumber">
+                <value>${tail}</value>
+            </Data>
+        </ExtendedData>
+    </Document>
+</kml>
+`;
+}
+
+
 const batchInput = document.getElementById('batch-input');
 const batchDrop = document.getElementById('batch-drop');
 const batchList = document.getElementById('batch-list');
@@ -1142,16 +1329,24 @@ async function processBatchFiles(files){
       const name = file.name.toLowerCase();
       let result;
       if (name.endsWith('.kml')) {
-        result = parseKML(text);
-      } else if (text.includes('<gx:coord>') || text.includes('<kml')) {
-        result = parseKML(text);
+        result = parseAnyKML(text);
+      } else if (text.includes('<kml') || text.includes('<Placemark>')) {
+        result = parseAnyKML(text);
       } else {
         result = parseCSV(text);
       }
 
-      const csvText = toG1000CSV(result.points);
-      const outName = file.name.replace(/\.(kml|csv|txt)$/i, '') + '_G1000.csv';
-      batchOutputs.push({ filename: outName, content: csvText });
+      const outFormat = document.querySelector('input[name="batch-format"]:checked').value;
+      let outContent, outExt;
+      if (outFormat === 'kml') {
+        outContent = toCleanKML(result.points, result.tailNumber);
+        outExt = '_track.kml';
+      } else {
+        outContent = toG1000CSV(result.points);
+        outExt = '_G1000.csv';
+      }
+      const outName = file.name.replace(/\.(kml|csv|txt)$/i, '') + outExt;
+      batchOutputs.push({ filename: outName, content: outContent });
 
       detailEl.textContent = `${result.points.length} pts`;
       statusEl.textContent = 'Converted';
