@@ -8,7 +8,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@400;600;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     --navy:#1a2332;
@@ -241,8 +240,9 @@
   /* ===== Compact map theme picker ===== */
   .theme-picker{
     position:absolute;
-    top:18px;
-    left:18px;
+    top:14px;
+    right:18px;
+    left:auto;
     z-index:1000;
     display:flex;
     align-items:center;
@@ -255,8 +255,8 @@
     box-shadow:0 4px 18px rgba(0,0,0,0.22);
   }
   .theme-dot{
-    width:22px;
-    height:22px;
+    width:20px;
+    height:20px;
     border-radius:999px;
     border:2px solid rgba(245,240,230,0.45);
     cursor:pointer;
@@ -346,7 +346,7 @@
     }
     .readouts{grid-template-columns:repeat(3,1fr); gap:10px;}
     .legend{ top:auto; bottom:64px; right:12px; left:12px; }
-    .theme-picker{ top:12px; left:12px; padding:6px; gap:6px; }
+    .theme-picker{ top:12px; right:12px; left:auto; padding:6px; gap:6px; }
     .theme-dot{ width:20px; height:20px; }
     .scrubber-wrap{
       left:50%;
@@ -549,16 +549,16 @@
   }
 
 
-  /* ===== Compact top panel: gives the map more viewable space ===== */
+  /* ===== Balanced top panel: calmer spacing without taking too much map room ===== */
   header{
-    padding:10px 20px 8px;
+    padding:14px 28px 12px;
     display:grid;
-    grid-template-columns:minmax(240px, 1fr) auto;
+    grid-template-columns:minmax(230px, 0.9fr) minmax(360px, 1.4fr) auto;
     grid-template-areas:
-      "title controls"
-      "meta tabs";
-    column-gap:18px;
-    row-gap:6px;
+      "title meta controls"
+      "tabs tabs tabs";
+    column-gap:28px;
+    row-gap:12px;
     align-items:center;
   }
   .eyebrow{
@@ -566,7 +566,7 @@
   }
   h1{
     grid-area:title;
-    font-size:clamp(18px,2.4vw,28px);
+    font-size:clamp(19px,2.25vw,29px);
     line-height:1.05;
     white-space:nowrap;
     overflow:hidden;
@@ -576,22 +576,23 @@
   .meta-row{
     grid-area:meta;
     margin-top:0;
-    gap:14px;
+    gap:24px;
     align-items:center;
+    justify-content:center;
     flex-wrap:nowrap;
     min-width:0;
   }
   .meta-item{
     min-height:0;
-    gap:0;
+    gap:1px;
   }
   .meta-label{
-    font-size:8px;
-    letter-spacing:0.13em;
+    font-size:9.5px;
+    letter-spacing:0.15em;
   }
   .meta-value{
-    font-size:12px;
-    line-height:1.15;
+    font-size:13.5px;
+    line-height:1.25;
   }
   .upload-area{
     grid-area:controls;
@@ -600,9 +601,9 @@
     align-self:center;
   }
   .upload-btn{
-    padding:8px 14px;
-    font-size:10px;
-    border-radius:5px;
+    padding:10px 17px;
+    font-size:10.5px;
+    border-radius:6px;
   }
   .upload-btn svg{
     width:14px;
@@ -614,32 +615,48 @@
   .tabs{
     grid-area:tabs;
     margin-top:0;
-    justify-content:flex-end;
+    justify-content:center;
     align-self:center;
   }
   .tab-btn{
-    padding:6px 12px;
-    font-size:9px;
+    padding:7px 16px;
+    font-size:9.5px;
     letter-spacing:0.1em;
   }
 
-  @media (max-width:760px){
+  @media (max-width:900px){
     header{
-      padding:8px 12px;
+      grid-template-columns:1fr auto;
+      grid-template-areas:
+        "title controls"
+        "meta meta"
+        "tabs tabs";
+      row-gap:10px;
+    }
+    .meta-row{
+      justify-content:flex-start;
+      gap:16px 22px;
+      flex-wrap:wrap;
+    }
+  }
+
+  @media (max-width:640px){
+    header{
+      padding:12px 14px;
       grid-template-columns:1fr;
       grid-template-areas:
         "title"
         "meta"
         "controls"
         "tabs";
-      row-gap:7px;
+      row-gap:10px;
     }
     h1{
       font-size:20px;
     }
     .meta-row{
       flex-wrap:wrap;
-      gap:8px 14px;
+      gap:10px 17px;
     }
     .upload-area{
       justify-self:stretch;
@@ -658,13 +675,107 @@
     }
   }
 
+
+
+  /* ===== Simplified single-view header + upload overlay ===== */
+  header{
+    display:grid;
+    grid-template-columns:minmax(240px,1fr) auto;
+    grid-template-areas:
+      "title upload"
+      "meta upload";
+    column-gap:28px;
+    row-gap:10px;
+    align-items:center;
+    padding:18px 30px 16px;
+  }
+  h1{
+    grid-area:title;
+    font-size:clamp(22px,2.7vw,34px);
+    line-height:1.05;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .meta-row{
+    grid-area:meta;
+    margin-top:0;
+    gap:24px;
+    align-items:center;
+    justify-content:flex-start;
+    flex-wrap:wrap;
+  }
+  .meta-item{ min-height:0; gap:2px; }
+  .meta-label{ font-size:9.5px; letter-spacing:0.15em; }
+  .meta-value{ font-size:13.5px; line-height:1.25; }
+  .upload-area{
+    grid-area:upload;
+    margin-left:0;
+    justify-self:end;
+    align-self:center;
+  }
+  .upload-btn{ padding:11px 18px; font-size:11px; border-radius:7px; }
+  .upload-btn svg{ width:15px; height:15px; }
+  .file-name{ display:none; }
+
+  .theme-picker{
+    position:absolute;
+    top:14px;
+    right:18px;
+    left:auto;
+  }
+
+  .empty-state{
+    background:transparent;
+    pointer-events:none;
+    align-items:flex-start;
+    justify-content:center;
+    padding-top:80px;
+  }
+  .empty-inner{
+    pointer-events:all;
+    max-width:520px;
+    padding:28px 30px 30px;
+    border-radius:14px;
+    background:rgba(26,35,50,0.86);
+    border:1px solid rgba(232,160,76,0.34);
+    box-shadow:0 18px 50px rgba(0,0,0,0.38);
+    backdrop-filter:blur(10px);
+  }
+  body[data-map-theme="white"] .empty-inner{
+    background:rgba(245,240,230,0.90);
+    color:var(--navy);
+    border-color:rgba(26,35,50,0.16);
+  }
+  body[data-map-theme="white"] .empty-inner h2{ color:var(--navy); }
+  body[data-map-theme="white"] .empty-inner p{ color:#53626b; }
+  .empty-inner h2{ font-size:26px; }
+  .empty-inner p{ margin-bottom:20px; }
+
+  @media (max-width:760px){
+    header{
+      grid-template-columns:1fr;
+      grid-template-areas:
+        "title"
+        "meta"
+        "upload";
+      padding:14px 16px;
+      row-gap:11px;
+    }
+    .upload-area{ justify-self:stretch; width:100%; }
+    .upload-btn{ width:100%; justify-content:center; }
+    .meta-row{ gap:10px 18px; }
+    .empty-state{ padding:72px 16px 24px; }
+    .theme-picker{ top:12px; right:12px; }
+  }
+
 </style>
 </head>
 <body data-map-theme="dark">
 
 <header>
-  <div class="eyebrow">Flight Track Viewer</div>
   <h1 id="title">Drop a track to <span class="tail">begin</span></h1>
+
   <div class="meta-row">
     <div class="meta-item">
       <span class="meta-label">Date</span>
@@ -682,18 +793,15 @@
       <span class="meta-label">Duration</span>
       <span class="meta-value empty" id="m-dur">—</span>
     </div>
-    <div class="upload-area">
-      <label class="upload-btn">
-        <svg viewBox="0 0 24 24"><path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6h2v6h10v-6h2zM12 2l5 5h-3v6h-4V7H7l5-5z"/></svg>
-        <span id="upload-label">Load KML / CSV</span>
-        <input type="file" id="file-input" accept=".kml,.csv,.txt">
-      </label>
-      <div class="file-name" id="file-name"></div>
-    </div>
   </div>
-  <div class="tabs">
-    <button class="tab-btn active" id="tab-viewer" type="button">Track Viewer</button>
-    <button class="tab-btn" id="tab-batch" type="button">Batch Export to G1000</button>
+
+  <div class="upload-area">
+    <label class="upload-btn">
+      <svg viewBox="0 0 24 24"><path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6h2v6h10v-6h2zM12 2l5 5h-3v6h-4V7H7l5-5z"/></svg>
+      <span id="upload-label">Load KML / CSV</span>
+      <input type="file" id="file-input" accept=".kml,.csv,.txt">
+    </label>
+    <div class="file-name" id="file-name"></div>
   </div>
 </header>
 
@@ -709,10 +817,8 @@
     <div class="empty-inner">
       <div class="spinner" id="spinner"></div>
       <h2 id="empty-title">No track loaded</h2>
-      <p id="empty-text">Upload a ForeFlight/Garmin KML track log, a G1000-format CSV
-        (for ForeFlight track log import), or a FlightRadar24-style CSV
-        (Timestamp, UTC, Callsign, Position, Altitude, Speed, Direction).
-        The path will be drawn on the map, color-coded by altitude, with a scrubber to step through the flight.</p>
+      <p id="empty-text">Load a KML or CSV flight track to draw it on the map.
+        The route will appear color-coded by altitude, with a scrubber below so you can replay the flight.</p>
       <label class="upload-btn">
         <svg viewBox="0 0 24 24"><path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6h2v6h10v-6h2zM12 2l5 5h-3v6h-4V7H7l5-5z"/></svg>
         <span>Choose a file</span>
@@ -790,43 +896,6 @@
     <input type="range" id="scrubber" min="0" max="1" value="0" step="1">
   </div>
 </main>
-
-<div class="view" id="batch-view">
-  <div class="batch-wrap">
-    <div class="format-select">
-      <div class="format-label">Output format</div>
-      <label class="format-option">
-        <input type="radio" name="batch-format" value="g1000" checked>
-        <span class="fo-title">ForeFlight Track Log (G1000 CSV)</span>
-        <span class="fo-desc">For importing flight history into ForeFlight's Track Logs / logbook</span>
-      </label>
-      <label class="format-option">
-        <input type="radio" name="batch-format" value="kml">
-        <span class="fo-title">Clean Custom Map (KML)</span>
-        <span class="fo-desc">A single tidy track line, no per-point labels — for ForeFlight Custom Maps</span>
-      </label>
-    </div>
-
-    <label class="batch-drop" id="batch-drop">
-      <svg viewBox="0 0 24 24"><path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6h2v6h10v-6h2zM12 2l5 5h-3v6h-4V7H7l5-5z"/></svg>
-      <h3>Drop KML or CSV files here</h3>
-      <p>Accepts ForeFlight/Garmin KML track logs (including raw FlightRadar24
-        KML exports), FlightRadar24-style CSVs, or G1000 CSVs. Each file is
-        converted to the output format selected above.</p>
-      <input type="file" id="batch-input" accept=".kml,.csv,.txt" multiple>
-    </label>
-
-    <div class="batch-list" id="batch-list"></div>
-
-    <div class="batch-actions" id="batch-actions" style="display:none;">
-      <button class="download-btn" id="batch-download">
-        <svg viewBox="0 0 24 24"><path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6h2v6h10v-6h2zM12 2l5 5h-3v6h-4V7H7l5-5z"/></svg>
-        Download ZIP
-      </button>
-      <span class="batch-summary" id="batch-summary"></span>
-    </div>
-  </div>
-</div>
 
 <script>
 // ===========================================================================
@@ -1446,7 +1515,7 @@ document.getElementById('file-input-2').addEventListener('change', e => {
   if (e.target.files[0]) handleFile(e.target.files[0]);
 });
 
-// Drag & drop onto map (viewer tab only)
+// Drag & drop onto map
 const viewerViewEl = document.getElementById('viewer-view');
 ['dragover','drop'].forEach(evt => {
   viewerViewEl.addEventListener(evt, e => e.preventDefault());
@@ -1454,263 +1523,6 @@ const viewerViewEl = document.getElementById('viewer-view');
 viewerViewEl.addEventListener('drop', e => {
   if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
 });
-// ===========================================================================
-// Tab switching
-// ===========================================================================
-const tabViewer = document.getElementById('tab-viewer');
-const tabBatch = document.getElementById('tab-batch');
-const viewerView = document.getElementById('viewer-view');
-const batchView = document.getElementById('batch-view');
-
-tabViewer.addEventListener('click', () => {
-  tabViewer.classList.add('active');
-  tabBatch.classList.remove('active');
-  viewerView.classList.add('active');
-  batchView.classList.remove('active');
-  setTimeout(() => map.invalidateSize(), 50);
-});
-tabBatch.addEventListener('click', () => {
-  tabBatch.classList.add('active');
-  tabViewer.classList.remove('active');
-  batchView.classList.add('active');
-  viewerView.classList.remove('active');
-});
-
-// ===========================================================================
-// G1000 CSV export (matches the kml2g1000 working format)
-// ===========================================================================
-const G1000_HEADER =
-  ' Lcl Date, Lcl Time, UTCOfst, AtvWpt,     Latitude,    Longitude,    AltB, ' +
-  'BaroA,  AltMSL,   OAT,    IAS, GndSpd,    VSpd,  Pitch,   Roll,  LatAc, ' +
-  'NormAc,   HDG,   TRK, volt1,  FQtyL,  FQtyR, E1 FFlow, E1 FPres, E1 OilT, ' +
-  'E1 OilP, E1 MAP, E1 RPM, E1 CHT1, E1 CHT2, E1 CHT3, E1 CHT4, E1 EGT1, ' +
-  'E1 EGT2, E1 EGT3, E1 EGT4,  AltGPS, TAS, HSIS,    CRS,   NAV1,   NAV2,    ' +
-  'COM1,    COM2,   HCDI,   VCDI, WndSpd, WndDr, WptDst, WptBrg, MagVar, ' +
-  'AfcsOn, RollM, PitchM, RollC, PichC, VSpdG, GPSfix,  HAL,   VAL, HPLwas, ' +
-  'HPLfd, VPLwas';
-const G1000_TAIL =
-  ', , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ';
-
-function padLeft(val, width){
-  const s = String(val);
-  return s.length >= width ? s : ' '.repeat(width - s.length) + s;
-}
-
-// Convert parsed points [lat, lon, alt_ft, speed_kt, course_deg, isoTimestamp] -> G1000 CSV text
-function toG1000CSV(points){
-  const rows = [G1000_HEADER];
-  for (const p of points){
-    const [lat, lon, alt, speed, , iso] = p;
-    const cleaned = iso.replace('Z','');
-    const [date, timeFull] = cleaned.split('T');
-    const time = timeFull.split('.')[0];
-
-    const row = `${date}, ${time}, 00:00, , ` +
-      `${padLeft(lat.toFixed(6), 12)}, ${padLeft(lon.toFixed(6), 12)}, , , ` +
-      `${padLeft(Math.round(alt), 7)}, , , ${padLeft(Math.round(Math.max(0,speed)), 6)}` +
-      G1000_TAIL;
-    rows.push(row);
-  }
-  return rows.join('\n');
-}
-
-// Convert parsed points -> a clean ForeFlight-style KML (single gx:Track, Start placemark,
-// optional speed/course extended-data arrays, no per-point labels/icons/descriptions)
-function toCleanKML(points, tailNumber){
-  const whenCoordLines = points.map(p => {
-    const [lat, lon, altFt] = p;
-    const altM = altFt / 3.28084;
-    return `                <when>${p[5]}</when>\n                <gx:coord>${lon.toFixed(6)} ${lat.toFixed(6)} ${altM.toFixed(1)}</gx:coord>`;
-  }).join('\n                \n');
-
-  const speedValues = points.map(p => `                    <gx:value>${Math.max(0,p[3]).toFixed(2)}</gx:value>`).join('\n                    \n');
-  const courseValues = points.map(p => `                    <gx:value>${p[4].toFixed(2)}</gx:value>`).join('\n                    \n');
-
-  const first = points[0];
-  const tail = tailNumber || '';
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2"  xmlns:gx="http://www.google.com/kml/ext/2.2">
-    <Document>
-        <open>1</open>
-        <visibility>1</visibility>
-
-        <Style id="trackStyle">
-            <LineStyle>
-                <color>ffDB9034</color>
-                <width>4</width>
-            </LineStyle>
-            <PolyStyle>
-                <color>80DB9034</color>
-            </PolyStyle>
-        </Style>
-
-        <Placemark>
-            <name></name>
-            <styleUrl>#trackStyle</styleUrl>
-            <gx:Track>
-                <altitudeMode>absolute</altitudeMode>
-                <extrude>1</extrude>
-                <gx:interpolate>1</gx:interpolate>
-                
-${whenCoordLines}
-                
-                <ExtendedData>
-                    <SchemaData>
-                        <gx:SimpleArrayData name="speed_kts">
-                    ${speedValues}
-                        </gx:SimpleArrayData>
-                        <gx:SimpleArrayData name="course">
-                    ${courseValues}
-                        </gx:SimpleArrayData>
-                    </SchemaData>
-                </ExtendedData>
-            </gx:Track>
-        </Placemark>
-        <Placemark>
-            <name>Start</name>
-            <Point>
-                <coordinates>${first[1].toFixed(6)},${first[0].toFixed(6)},${(first[2]/3.28084).toFixed(1)}</coordinates>
-            </Point>
-        </Placemark>
-        <ExtendedData>
-            <Data name="source">
-                <displayName>Source</displayName>
-                <value>Flight Track Viewer</value>
-            </Data>
-            <Data name="tailNumber">
-                <value>${tail}</value>
-            </Data>
-        </ExtendedData>
-    </Document>
-</kml>
-`;
-}
-
-
-const batchInput = document.getElementById('batch-input');
-const batchDrop = document.getElementById('batch-drop');
-const batchList = document.getElementById('batch-list');
-const batchActions = document.getElementById('batch-actions');
-const batchDownload = document.getElementById('batch-download');
-const batchSummary = document.getElementById('batch-summary');
-
-let batchOutputs = []; // {filename, content}
-
-function readFileAsText(file){
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target.result);
-    reader.onerror = reject;
-    reader.readAsText(file);
-  });
-}
-
-function addBatchRow(name){
-  const row = document.createElement('div');
-  row.className = 'batch-item';
-  row.innerHTML = `
-    <span class="bi-name">${name}</span>
-    <span class="bi-detail" id="detail-${name}"></span>
-    <span class="bi-status pending" id="status-${name}">Processing…</span>
-  `;
-  batchList.appendChild(row);
-  return row;
-}
-
-async function processBatchFiles(files){
-  batchOutputs = [];
-  batchList.innerHTML = '';
-  batchActions.style.display = 'none';
-
-  let okCount = 0, errCount = 0;
-
-  for (const file of files){
-    const safeId = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-    addBatchRow(safeId);
-    const statusEl = document.getElementById(`status-${safeId}`);
-    const detailEl = document.getElementById(`detail-${safeId}`);
-
-    try {
-      const text = await readFileAsText(file);
-      const name = file.name.toLowerCase();
-      let result;
-      if (name.endsWith('.kml')) {
-        result = parseAnyKML(text);
-      } else if (text.includes('<kml') || text.includes('<Placemark>')) {
-        result = parseAnyKML(text);
-      } else {
-        result = parseCSV(text);
-      }
-
-      const outFormat = document.querySelector('input[name="batch-format"]:checked').value;
-      let outContent, outExt;
-      if (outFormat === 'kml') {
-        outContent = toCleanKML(result.points, result.tailNumber);
-        outExt = '_track.kml';
-      } else {
-        outContent = toG1000CSV(result.points);
-        outExt = '_G1000.csv';
-      }
-      const outName = file.name.replace(/\.(kml|csv|txt)$/i, '') + outExt;
-      batchOutputs.push({ filename: outName, content: outContent });
-
-      detailEl.textContent = `${result.points.length} pts`;
-      statusEl.textContent = 'Converted';
-      statusEl.classList.remove('pending');
-      statusEl.classList.add('ok');
-      okCount++;
-    } catch (err) {
-      detailEl.textContent = err.message;
-      statusEl.textContent = 'Failed';
-      statusEl.classList.remove('pending');
-      statusEl.classList.add('err');
-      errCount++;
-    }
-  }
-
-  if (batchOutputs.length > 0){
-    batchActions.style.display = 'flex';
-    batchSummary.textContent = `${okCount} converted${errCount ? `, ${errCount} failed` : ''}`;
-    batchDownload.disabled = false;
-  } else {
-    batchSummary.textContent = `${errCount} failed`;
-    batchDownload.disabled = true;
-  }
-}
-
-batchInput.addEventListener('change', e => {
-  if (e.target.files.length) processBatchFiles([...e.target.files]);
-});
-
-['dragover','dragleave','drop'].forEach(evt => {
-  batchDrop.addEventListener(evt, e => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (evt === 'dragover') batchDrop.classList.add('dragover');
-    else batchDrop.classList.remove('dragover');
-  });
-});
-batchDrop.addEventListener('drop', e => {
-  if (e.dataTransfer.files.length) processBatchFiles([...e.dataTransfer.files]);
-});
-
-batchDownload.addEventListener('click', async () => {
-  const zip = new JSZip();
-  for (const out of batchOutputs){
-    zip.file(out.filename, out.content);
-  }
-  const blob = await zip.generateAsync({ type: 'blob' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'g1000_exports.zip';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-});
-
 </script>
 
 </body>
