@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@400;600;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     --navy:#1a2332;
@@ -279,6 +280,147 @@
     .gauge-fill{ transition:none; }
     .play-btn{ transition:none; }
   }
+
+  /* ===== Tabs ===== */
+  .tabs{
+    display:flex;
+    gap:8px;
+    margin-top:16px;
+  }
+  .tab-btn{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--taxiway);
+    background:transparent;
+    border:1px solid var(--panel);
+    border-radius:6px;
+    padding:8px 16px;
+    cursor:pointer;
+    transition:all 0.15s ease;
+  }
+  .tab-btn.active{
+    color:var(--amber);
+    border-color:rgba(232,160,76,0.5);
+    background:rgba(232,160,76,0.08);
+  }
+  .tab-btn:hover{ color:var(--cream); }
+
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  /* ===== Batch export view ===== */
+  #batch-view{
+    height:calc(100vh - 132px);
+    min-height:480px;
+    overflow-y:auto;
+    padding:40px 32px;
+  }
+  .batch-wrap{ max-width:680px; margin:0 auto; }
+  .batch-drop{
+    border:2px dashed rgba(232,160,76,0.35);
+    border-radius:10px;
+    padding:48px 24px;
+    text-align:center;
+    cursor:pointer;
+    transition:all 0.15s ease;
+  }
+  .batch-drop:hover, .batch-drop.dragover{
+    border-color:var(--amber);
+    background:rgba(232,160,76,0.06);
+  }
+  .batch-drop input{ display:none; }
+  .batch-drop h3{
+    font-family:'Bitter',serif;
+    font-size:20px;
+    font-weight:800;
+    margin-bottom:8px;
+    color:var(--cream);
+  }
+  .batch-drop p{
+    font-size:12px;
+    color:var(--taxiway);
+    line-height:1.6;
+  }
+  .batch-drop svg{
+    width:36px; height:36px;
+    fill:var(--amber);
+    margin-bottom:14px;
+  }
+
+  .batch-list{
+    margin-top:24px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .batch-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:12px 16px;
+    background:rgba(61,79,92,0.25);
+    border:1px solid var(--panel);
+    border-radius:6px;
+    font-size:12px;
+  }
+  .batch-item .bi-name{
+    font-weight:700;
+    color:var(--cream);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .batch-item .bi-status{
+    flex-shrink:0;
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+  }
+  .batch-item .bi-status.ok{ color:#7fb685; }
+  .batch-item .bi-status.err{ color:var(--red); }
+  .batch-item .bi-status.pending{ color:var(--taxiway); }
+  .batch-item .bi-detail{
+    font-size:11px;
+    color:var(--taxiway);
+    flex-shrink:0;
+  }
+
+  .batch-actions{
+    margin-top:24px;
+    display:flex;
+    gap:12px;
+    align-items:center;
+  }
+  .download-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    padding:13px 24px;
+    border:none;
+    border-radius:6px;
+    background:var(--amber);
+    color:var(--navy);
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition:transform 0.15s ease;
+  }
+  .download-btn:hover{ transform:scale(1.03); }
+  .download-btn:disabled{ opacity:0.4; cursor:not-allowed; transform:none; }
+  .download-btn svg{ width:16px; height:16px; fill:var(--navy); }
+  .batch-summary{ font-size:12px; color:var(--taxiway); }
+
+  @media (max-width:640px){
+    #batch-view{ padding:24px 16px; }
+    .batch-drop{ padding:32px 16px; }
+  }
 </style>
 </head>
 <body>
@@ -312,9 +454,13 @@
       <div class="file-name" id="file-name"></div>
     </div>
   </div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-viewer" type="button">Track Viewer</button>
+    <button class="tab-btn" id="tab-batch" type="button">Batch Export to G1000</button>
+  </div>
 </header>
 
-<main>
+<main class="view active" id="viewer-view">
   <div id="map"></div>
 
   <div class="empty-state" id="empty-state">
@@ -389,6 +535,29 @@
     <svg id="pause-icon" viewBox="0 0 24 24" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
   </button>
 </main>
+
+<div class="view" id="batch-view">
+  <div class="batch-wrap">
+    <label class="batch-drop" id="batch-drop">
+      <svg viewBox="0 0 24 24"><path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6h2v6h10v-6h2zM12 2l5 5h-3v6h-4V7H7l5-5z"/></svg>
+      <h3>Drop KML or CSV files here</h3>
+      <p>Accepts ForeFlight/Garmin KML track logs, FlightRadar24-style CSVs, or
+        G1000 CSVs (re-exporting is fine). Each file is converted to a
+        G1000-format CSV ready for ForeFlight track log import.</p>
+      <input type="file" id="batch-input" accept=".kml,.csv,.txt" multiple>
+    </label>
+
+    <div class="batch-list" id="batch-list"></div>
+
+    <div class="batch-actions" id="batch-actions" style="display:none;">
+      <button class="download-btn" id="batch-download">
+        <svg viewBox="0 0 24 24"><path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6h2v6h10v-6h2zM12 2l5 5h-3v6h-4V7H7l5-5z"/></svg>
+        Download ZIP
+      </button>
+      <span class="batch-summary" id="batch-summary"></span>
+    </div>
+  </div>
+</div>
 
 <script>
 // ===========================================================================
@@ -848,13 +1017,192 @@ document.getElementById('file-input-2').addEventListener('change', e => {
   if (e.target.files[0]) handleFile(e.target.files[0]);
 });
 
-// Drag & drop onto map
+// Drag & drop onto map (viewer tab only)
+const viewerViewEl = document.getElementById('viewer-view');
 ['dragover','drop'].forEach(evt => {
-  document.body.addEventListener(evt, e => e.preventDefault());
+  viewerViewEl.addEventListener(evt, e => e.preventDefault());
 });
-document.body.addEventListener('drop', e => {
+viewerViewEl.addEventListener('drop', e => {
   if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
 });
+// ===========================================================================
+// Tab switching
+// ===========================================================================
+const tabViewer = document.getElementById('tab-viewer');
+const tabBatch = document.getElementById('tab-batch');
+const viewerView = document.getElementById('viewer-view');
+const batchView = document.getElementById('batch-view');
+
+tabViewer.addEventListener('click', () => {
+  tabViewer.classList.add('active');
+  tabBatch.classList.remove('active');
+  viewerView.classList.add('active');
+  batchView.classList.remove('active');
+  setTimeout(() => map.invalidateSize(), 50);
+});
+tabBatch.addEventListener('click', () => {
+  tabBatch.classList.add('active');
+  tabViewer.classList.remove('active');
+  batchView.classList.add('active');
+  viewerView.classList.remove('active');
+});
+
+// ===========================================================================
+// G1000 CSV export (matches the kml2g1000 working format)
+// ===========================================================================
+const G1000_HEADER =
+  ' Lcl Date, Lcl Time, UTCOfst, AtvWpt,     Latitude,    Longitude,    AltB, ' +
+  'BaroA,  AltMSL,   OAT,    IAS, GndSpd,    VSpd,  Pitch,   Roll,  LatAc, ' +
+  'NormAc,   HDG,   TRK, volt1,  FQtyL,  FQtyR, E1 FFlow, E1 FPres, E1 OilT, ' +
+  'E1 OilP, E1 MAP, E1 RPM, E1 CHT1, E1 CHT2, E1 CHT3, E1 CHT4, E1 EGT1, ' +
+  'E1 EGT2, E1 EGT3, E1 EGT4,  AltGPS, TAS, HSIS,    CRS,   NAV1,   NAV2,    ' +
+  'COM1,    COM2,   HCDI,   VCDI, WndSpd, WndDr, WptDst, WptBrg, MagVar, ' +
+  'AfcsOn, RollM, PitchM, RollC, PichC, VSpdG, GPSfix,  HAL,   VAL, HPLwas, ' +
+  'HPLfd, VPLwas';
+const G1000_TAIL =
+  ', , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ';
+
+function padLeft(val, width){
+  const s = String(val);
+  return s.length >= width ? s : ' '.repeat(width - s.length) + s;
+}
+
+// Convert parsed points [lat, lon, alt_ft, speed_kt, course_deg, isoTimestamp] -> G1000 CSV text
+function toG1000CSV(points){
+  const rows = [G1000_HEADER];
+  for (const p of points){
+    const [lat, lon, alt, speed, , iso] = p;
+    const cleaned = iso.replace('Z','');
+    const [date, timeFull] = cleaned.split('T');
+    const time = timeFull.split('.')[0];
+
+    const row = `${date}, ${time}, 00:00, , ` +
+      `${padLeft(lat.toFixed(6), 12)}, ${padLeft(lon.toFixed(6), 12)}, , , ` +
+      `${padLeft(Math.round(alt), 7)}, , , ${padLeft(Math.round(Math.max(0,speed)), 6)}` +
+      G1000_TAIL;
+    rows.push(row);
+  }
+  return rows.join('\n');
+}
+
+// ===========================================================================
+// Batch export
+// ===========================================================================
+const batchInput = document.getElementById('batch-input');
+const batchDrop = document.getElementById('batch-drop');
+const batchList = document.getElementById('batch-list');
+const batchActions = document.getElementById('batch-actions');
+const batchDownload = document.getElementById('batch-download');
+const batchSummary = document.getElementById('batch-summary');
+
+let batchOutputs = []; // {filename, content}
+
+function readFileAsText(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsText(file);
+  });
+}
+
+function addBatchRow(name){
+  const row = document.createElement('div');
+  row.className = 'batch-item';
+  row.innerHTML = `
+    <span class="bi-name">${name}</span>
+    <span class="bi-detail" id="detail-${name}"></span>
+    <span class="bi-status pending" id="status-${name}">Processing…</span>
+  `;
+  batchList.appendChild(row);
+  return row;
+}
+
+async function processBatchFiles(files){
+  batchOutputs = [];
+  batchList.innerHTML = '';
+  batchActions.style.display = 'none';
+
+  let okCount = 0, errCount = 0;
+
+  for (const file of files){
+    const safeId = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    addBatchRow(safeId);
+    const statusEl = document.getElementById(`status-${safeId}`);
+    const detailEl = document.getElementById(`detail-${safeId}`);
+
+    try {
+      const text = await readFileAsText(file);
+      const name = file.name.toLowerCase();
+      let result;
+      if (name.endsWith('.kml')) {
+        result = parseKML(text);
+      } else if (text.includes('<gx:coord>') || text.includes('<kml')) {
+        result = parseKML(text);
+      } else {
+        result = parseCSV(text);
+      }
+
+      const csvText = toG1000CSV(result.points);
+      const outName = file.name.replace(/\.(kml|csv|txt)$/i, '') + '_G1000.csv';
+      batchOutputs.push({ filename: outName, content: csvText });
+
+      detailEl.textContent = `${result.points.length} pts`;
+      statusEl.textContent = 'Converted';
+      statusEl.classList.remove('pending');
+      statusEl.classList.add('ok');
+      okCount++;
+    } catch (err) {
+      detailEl.textContent = err.message;
+      statusEl.textContent = 'Failed';
+      statusEl.classList.remove('pending');
+      statusEl.classList.add('err');
+      errCount++;
+    }
+  }
+
+  if (batchOutputs.length > 0){
+    batchActions.style.display = 'flex';
+    batchSummary.textContent = `${okCount} converted${errCount ? `, ${errCount} failed` : ''}`;
+    batchDownload.disabled = false;
+  } else {
+    batchSummary.textContent = `${errCount} failed`;
+    batchDownload.disabled = true;
+  }
+}
+
+batchInput.addEventListener('change', e => {
+  if (e.target.files.length) processBatchFiles([...e.target.files]);
+});
+
+['dragover','dragleave','drop'].forEach(evt => {
+  batchDrop.addEventListener(evt, e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (evt === 'dragover') batchDrop.classList.add('dragover');
+    else batchDrop.classList.remove('dragover');
+  });
+});
+batchDrop.addEventListener('drop', e => {
+  if (e.dataTransfer.files.length) processBatchFiles([...e.dataTransfer.files]);
+});
+
+batchDownload.addEventListener('click', async () => {
+  const zip = new JSZip();
+  for (const out of batchOutputs){
+    zip.file(out.filename, out.content);
+  }
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'g1000_exports.zip';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
 </script>
 
 </body>
