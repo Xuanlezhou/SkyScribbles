@@ -154,7 +154,7 @@
   .panel{
     position:fixed;
     left:50%;
-    bottom:138px;
+    bottom:48px;
     transform:translateX(-50%);
     z-index:1000;
     background:rgba(26,35,50,0.92);
@@ -166,7 +166,7 @@
     align-items:center;
     gap:24px;
     box-shadow:0 8px 32px rgba(0,0,0,0.4);
-    width:min(720px, calc(100vw - 48px));
+    width:min(820px, calc(100vw - 48px));
     max-width:calc(100vw - 48px);
     opacity:0;
     pointer-events:none;
@@ -194,11 +194,10 @@
   /* ===== Scrubber ===== */
   .scrubber-wrap{
     position:fixed;
-    left:50%;
-    bottom:112px;
-    transform:translateX(-50%);
+    left:24px;
+    right:24px;
+    bottom:18px;
     z-index:1000;
-    width:min(720px, calc(100vw - 48px));
     padding:0;
     background:none;
     pointer-events:none;
@@ -239,64 +238,46 @@
   .gradient-bar{ width:140px; height:8px; border-radius:4px; background:linear-gradient(90deg, #5b8a9a, #e8a04c, #d9534f); margin-bottom:4px; }
   .gradient-labels{ display:flex; justify-content:space-between; color:var(--cream); opacity:0.8; }
 
-  /* ===== Bottom controls ===== */
-  .play-btn{
-    position:fixed;
-    left:24px;
-    right:24px;
-    bottom:16px;
-    z-index:1001;
-    height:48px;
-    border-radius:10px;
-    background:var(--amber);
-    border:none;
+  /* ===== Panel controls ===== */
+  .panel-actions{
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-shrink:0;
+  }
+
+  .panel-icon-btn{
+    width:44px;
+    height:44px;
+    border-radius:50%;
     display:flex;
     align-items:center;
     justify-content:center;
-    gap:10px;
-    cursor:pointer;
-    box-shadow:0 4px 16px rgba(0,0,0,0.4);
-    transition:transform 0.15s ease, opacity 0.25s ease;
-    opacity:0;
-    pointer-events:none;
-    color:var(--navy);
-    font-family:'Space Mono',monospace;
-    font-size:13px;
-    font-weight:700;
-    letter-spacing:0.14em;
-    text-transform:uppercase;
-  }
-  .play-btn.visible{ opacity:1; pointer-events:all; }
-  .play-btn:hover{ transform:translateY(-1px); }
-  .play-btn:active{ transform:translateY(1px); }
-  .play-btn svg{ width:18px; height:18px; fill:var(--navy); flex-shrink:0; }
-
-  .fit-track-btn{
-    position:fixed;
-    left:24px;
-    right:24px;
-    bottom:72px;
-    z-index:1001;
-    height:32px;
-    border-radius:8px;
-    border:1px solid rgba(232,160,76,0.45);
-    background:rgba(26,35,50,0.92);
-    color:var(--amber);
-    backdrop-filter:blur(8px);
-    font-family:'Space Mono',monospace;
-    font-size:11px;
-    font-weight:700;
-    letter-spacing:0.14em;
-    text-transform:uppercase;
     cursor:pointer;
     box-shadow:0 4px 16px rgba(0,0,0,0.35);
+    transition:transform 0.15s ease, opacity 0.25s ease, background 0.15s ease;
     opacity:0;
     pointer-events:none;
-    transition:opacity 0.25s ease, transform 0.15s ease, background 0.15s ease;
   }
-  .fit-track-btn.visible{ opacity:1; pointer-events:all; }
-  .fit-track-btn:hover{ background:rgba(232,160,76,0.10); transform:translateY(-1px); }
-  .fit-track-btn:active{ transform:translateY(1px); }
+  .panel-icon-btn.visible{ opacity:1; pointer-events:all; }
+  .panel-icon-btn:hover{ transform:scale(1.06); }
+  .panel-icon-btn:active{ transform:scale(0.97); }
+  .panel-icon-btn svg{ width:20px; height:20px; flex-shrink:0; }
+
+  .play-btn{
+    background:var(--amber);
+    border:none;
+  }
+  .play-btn svg{ fill:var(--navy); }
+
+  .fit-track-btn{
+    border:1px solid rgba(232,160,76,0.45);
+    background:rgba(61,79,92,0.42);
+    color:var(--amber);
+  }
+  .fit-track-btn:hover{ background:rgba(232,160,76,0.10); }
+  .fit-track-btn svg{ fill:none; stroke:var(--amber); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 
   /* spinner for loading */
   .spinner{
@@ -317,31 +298,29 @@
     .upload-area{ margin-left:0; width:100%; margin-top:10px; }
     .upload-btn{ width:100%; justify-content:center; }
     .panel{
-      left:50%;
-      right:auto;
-      bottom:124px;
-      transform:translateX(-50%);
-      width:calc(100vw - 24px);
-      max-width:calc(100vw - 24px);
+      left:12px; right:12px; bottom:50px;
+      transform:none;
+      width:auto;
+      max-width:none;
       flex-direction:column; align-items:flex-start; gap:14px; padding:14px 16px;
     }
     .readouts{grid-template-columns:repeat(3,1fr); gap:10px;}
-    .legend{ top:auto; bottom:64px; right:12px; left:12px; }
-    .scrubber-wrap{
-      left:50%;
-      right:auto;
-      bottom:102px;
-      transform:translateX(-50%);
-      width:calc(100vw - 24px);
+    .panel-actions{
+      width:100%;
+      justify-content:flex-end;
+      margin-left:0;
     }
-    .play-btn{ left:12px; right:12px; bottom:12px; }
-    .fit-track-btn{ left:12px; right:12px; bottom:68px; }
+    .legend{ top:auto; bottom:230px; right:12px; left:12px; }
+    .scrubber-wrap{
+      left:12px;
+      right:12px;
+      bottom:18px;
+    }
   }
 
   @media (prefers-reduced-motion: reduce){
     .gauge-fill{ transition:none; }
-    .play-btn{ transition:none; }
-    .fit-track-btn{ transition:none; }
+    .panel-icon-btn{ transition:none; }
   }
 
   /* ===== Tabs ===== */
@@ -630,19 +609,29 @@
         <span class="rval" id="r-lon">—</span>
       </div>
     </div>
+    <div class="panel-actions">
+      <button class="panel-icon-btn fit-track-btn" id="fit-track" type="button" aria-label="Fit track to screen" title="Fit track to screen">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 3H3v5"/>
+          <path d="M3 3l6 6"/>
+          <path d="M16 3h5v5"/>
+          <path d="M21 3l-6 6"/>
+          <path d="M8 21H3v-5"/>
+          <path d="M3 21l6-6"/>
+          <path d="M16 21h5v-5"/>
+          <path d="M21 21l-6-6"/>
+        </svg>
+      </button>
+      <button class="panel-icon-btn play-btn" id="play" aria-label="Play flight path" title="Play flight path">
+        <svg id="play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="pause-icon" viewBox="0 0 24 24" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+      </button>
+    </div>
   </div>
 
   <div class="scrubber-wrap" id="scrubber-wrap">
     <input type="range" id="scrubber" min="0" max="1" value="0" step="1">
   </div>
-
-  <button class="fit-track-btn" id="fit-track" type="button">Fit track to screen</button>
-
-  <button class="play-btn" id="play" aria-label="Play flight path">
-    <svg id="play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-    <svg id="pause-icon" viewBox="0 0 24 24" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
-    <span id="play-label">Play</span>
-  </button>
 </main>
 
 <div class="view" id="batch-view">
@@ -1020,7 +1009,7 @@ function fitTrackToView(){
   map.invalidateSize();
   map.fitBounds(trackBounds, {
     paddingTopLeft: [48, 48],
-    paddingBottomRight: [48, 230]
+    paddingBottomRight: [48, 180]
   });
 }
 
@@ -1138,7 +1127,6 @@ let playTimer = null;
 const playBtn = document.getElementById('play');
 const playIcon = document.getElementById('play-icon');
 const pauseIcon = document.getElementById('pause-icon');
-const playLabel = document.getElementById('play-label');
 const fitTrackBtn = document.getElementById('fit-track');
 
 function stopPlay(){
@@ -1146,14 +1134,12 @@ function stopPlay(){
   clearInterval(playTimer);
   playIcon.style.display = '';
   pauseIcon.style.display = 'none';
-  playLabel.textContent = 'Play';
 }
 function startPlay(){
   if (!FLIGHT.length) return;
   playing = true;
   playIcon.style.display = 'none';
   pauseIcon.style.display = '';
-  playLabel.textContent = 'Pause';
   playTimer = setInterval(() => {
     let idx = parseInt(scrubber.value) + Math.max(1, Math.floor(FLIGHT.length/250));
     if (idx >= FLIGHT.length){ idx = FLIGHT.length - 1; stopPlay(); }
