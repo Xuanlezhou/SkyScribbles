@@ -154,7 +154,7 @@
   .panel{
     position:fixed;
     left:50%;
-    bottom:46px;
+    bottom:138px;
     transform:translateX(-50%);
     z-index:1000;
     background:rgba(26,35,50,0.92);
@@ -166,8 +166,8 @@
     align-items:center;
     gap:24px;
     box-shadow:0 8px 32px rgba(0,0,0,0.4);
-    width:min(720px, calc(100vw - 160px));
-    max-width:calc(100vw - 160px);
+    width:min(720px, calc(100vw - 48px));
+    max-width:calc(100vw - 48px);
     opacity:0;
     pointer-events:none;
     transition:opacity 0.25s ease;
@@ -195,10 +195,10 @@
   .scrubber-wrap{
     position:fixed;
     left:50%;
-    bottom:12px;
+    bottom:112px;
     transform:translateX(-50%);
     z-index:1000;
-    width:min(720px, calc(100vw - 160px));
+    width:min(720px, calc(100vw - 48px));
     padding:0;
     background:none;
     pointer-events:none;
@@ -239,22 +239,64 @@
   .gradient-bar{ width:140px; height:8px; border-radius:4px; background:linear-gradient(90deg, #5b8a9a, #e8a04c, #d9534f); margin-bottom:4px; }
   .gradient-labels{ display:flex; justify-content:space-between; color:var(--cream); opacity:0.8; }
 
-  /* ===== Play control ===== */
+  /* ===== Bottom controls ===== */
   .play-btn{
-    position:fixed; bottom:24px; right:24px; z-index:1001;
-    width:48px;height:48px; border-radius:50%;
-    background:var(--amber); border:none;
-    display:flex; align-items:center; justify-content:center;
+    position:fixed;
+    left:24px;
+    right:24px;
+    bottom:16px;
+    z-index:1001;
+    height:48px;
+    border-radius:10px;
+    background:var(--amber);
+    border:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
     cursor:pointer;
     box-shadow:0 4px 16px rgba(0,0,0,0.4);
     transition:transform 0.15s ease, opacity 0.25s ease;
     opacity:0;
     pointer-events:none;
+    color:var(--navy);
+    font-family:'Space Mono',monospace;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
   }
   .play-btn.visible{ opacity:1; pointer-events:all; }
-  .play-btn:hover{ transform:scale(1.06); }
-  .play-btn:active{ transform:scale(0.97); }
-  .play-btn svg{ width:18px; height:18px; fill:var(--navy); }
+  .play-btn:hover{ transform:translateY(-1px); }
+  .play-btn:active{ transform:translateY(1px); }
+  .play-btn svg{ width:18px; height:18px; fill:var(--navy); flex-shrink:0; }
+
+  .fit-track-btn{
+    position:fixed;
+    left:24px;
+    right:24px;
+    bottom:72px;
+    z-index:1001;
+    height:32px;
+    border-radius:8px;
+    border:1px solid rgba(232,160,76,0.45);
+    background:rgba(26,35,50,0.92);
+    color:var(--amber);
+    backdrop-filter:blur(8px);
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    cursor:pointer;
+    box-shadow:0 4px 16px rgba(0,0,0,0.35);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.25s ease, transform 0.15s ease, background 0.15s ease;
+  }
+  .fit-track-btn.visible{ opacity:1; pointer-events:all; }
+  .fit-track-btn:hover{ background:rgba(232,160,76,0.10); transform:translateY(-1px); }
+  .fit-track-btn:active{ transform:translateY(1px); }
 
   /* spinner for loading */
   .spinner{
@@ -277,7 +319,7 @@
     .panel{
       left:50%;
       right:auto;
-      bottom:52px;
+      bottom:124px;
       transform:translateX(-50%);
       width:calc(100vw - 24px);
       max-width:calc(100vw - 24px);
@@ -288,16 +330,18 @@
     .scrubber-wrap{
       left:50%;
       right:auto;
-      bottom:14px;
+      bottom:102px;
       transform:translateX(-50%);
-      width:calc(100vw - 96px);
+      width:calc(100vw - 24px);
     }
-    .play-btn{ bottom:12px; right:12px; }
+    .play-btn{ left:12px; right:12px; bottom:12px; }
+    .fit-track-btn{ left:12px; right:12px; bottom:68px; }
   }
 
   @media (prefers-reduced-motion: reduce){
     .gauge-fill{ transition:none; }
     .play-btn{ transition:none; }
+    .fit-track-btn{ transition:none; }
   }
 
   /* ===== Tabs ===== */
@@ -592,9 +636,12 @@
     <input type="range" id="scrubber" min="0" max="1" value="0" step="1">
   </div>
 
+  <button class="fit-track-btn" id="fit-track" type="button">Fit track to screen</button>
+
   <button class="play-btn" id="play" aria-label="Play flight path">
     <svg id="play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
     <svg id="pause-icon" viewBox="0 0 24 24" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+    <span id="play-label">Play</span>
   </button>
 </main>
 
@@ -643,6 +690,7 @@ let FLIGHT = [];       // [lat, lon, alt_ft, speed_kt, course_deg, isoTimestamp]
 let polylines = [];
 let marker = null;
 let altMin = 0, altMax = 0;
+let trackBounds = null;
 
 const map = L.map('map', { zoomControl: true, attributionControl: true, center:[39.8,-98.5], zoom: 4 });
 window.addEventListener('resize', () => map.invalidateSize());
@@ -964,6 +1012,16 @@ function clearTrack(){
   polylines.forEach(p => map.removeLayer(p));
   polylines = [];
   if (marker) { map.removeLayer(marker); marker = null; }
+  trackBounds = null;
+}
+
+function fitTrackToView(){
+  if (!trackBounds) return;
+  map.invalidateSize();
+  map.fitBounds(trackBounds, {
+    paddingTopLeft: [48, 48],
+    paddingBottomRight: [48, 230]
+  });
 }
 
 function renderTrack(points, tailNumber){
@@ -987,8 +1045,8 @@ function renderTrack(points, tailNumber){
     bounds.push([a[0],a[1]]);
   }
   bounds.push([FLIGHT[FLIGHT.length-1][0], FLIGHT[FLIGHT.length-1][1]]);
-  map.invalidateSize();
-  map.fitBounds(bounds, { padding: [40,40] });
+  trackBounds = L.latLngBounds(bounds);
+  fitTrackToView();
 
   const planeIcon = L.divIcon({
     className: 'plane-icon',
@@ -1027,6 +1085,7 @@ function renderTrack(points, tailNumber){
   document.getElementById('scrubber-wrap').classList.add('visible');
   document.getElementById('legend').classList.add('visible');
   document.getElementById('play').classList.add('visible');
+  document.getElementById('fit-track').classList.add('visible');
 
   update(0);
 }
@@ -1079,18 +1138,22 @@ let playTimer = null;
 const playBtn = document.getElementById('play');
 const playIcon = document.getElementById('play-icon');
 const pauseIcon = document.getElementById('pause-icon');
+const playLabel = document.getElementById('play-label');
+const fitTrackBtn = document.getElementById('fit-track');
 
 function stopPlay(){
   playing = false;
   clearInterval(playTimer);
   playIcon.style.display = '';
   pauseIcon.style.display = 'none';
+  playLabel.textContent = 'Play';
 }
 function startPlay(){
   if (!FLIGHT.length) return;
   playing = true;
   playIcon.style.display = 'none';
   pauseIcon.style.display = '';
+  playLabel.textContent = 'Pause';
   playTimer = setInterval(() => {
     let idx = parseInt(scrubber.value) + Math.max(1, Math.floor(FLIGHT.length/250));
     if (idx >= FLIGHT.length){ idx = FLIGHT.length - 1; stopPlay(); }
@@ -1099,6 +1162,7 @@ function startPlay(){
   }, 40);
 }
 playBtn.addEventListener('click', () => playing ? stopPlay() : startPlay());
+fitTrackBtn.addEventListener('click', fitTrackToView);
 
 // ===========================================================================
 // File handling
