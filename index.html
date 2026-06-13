@@ -240,11 +240,12 @@
   /* ===== Compact map theme picker ===== */
   .theme-picker{
     position:absolute;
-    top:14px;
+    top:68px;
     right:18px;
     left:auto;
     z-index:1000;
     display:flex;
+    flex-direction:column;
     align-items:center;
     gap:7px;
     padding:7px;
@@ -317,6 +318,63 @@
   .fit-track-btn:hover{ background:rgba(232,160,76,0.10); }
   .fit-track-btn svg{ fill:none; stroke:var(--amber); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 
+
+
+  /* ===== Compact export controls ===== */
+  .export-bar{
+    position:absolute;
+    top:14px;
+    right:18px;
+    left:auto;
+    bottom:auto;
+    z-index:1001;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:7px;
+    border-radius:999px;
+    background:rgba(26,35,50,0.82);
+    border:1px solid rgba(232,160,76,0.28);
+    backdrop-filter:blur(8px);
+    box-shadow:0 6px 24px rgba(0,0,0,0.28);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.25s ease;
+  }
+  .export-bar.visible{ opacity:1; pointer-events:all; }
+  .export-label{
+    padding:0 6px 0 8px;
+    font-size:10px;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:var(--taxiway);
+  }
+  .export-btn{
+    border:1px solid rgba(232,160,76,0.35);
+    background:rgba(232,160,76,0.08);
+    color:var(--cream);
+    border-radius:999px;
+    padding:8px 12px;
+    font-family:'Space Mono',monospace;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition:background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  }
+  .export-btn:hover{
+    background:rgba(232,160,76,0.16);
+    border-color:rgba(232,160,76,0.65);
+    transform:translateY(-1px);
+  }
+  body[data-map-theme="white"] .export-bar{
+    background:rgba(245,240,230,0.86);
+    border-color:rgba(26,35,50,0.16);
+    box-shadow:0 6px 24px rgba(26,35,50,0.16);
+  }
+  body[data-map-theme="white"] .export-btn{ color:var(--navy); }
+
   /* spinner for loading */
   .spinner{
     width:28px; height:28px;
@@ -357,6 +415,7 @@
     }
     .play-btn{ left:12px; right:12px; bottom:12px; }
     .fit-track-btn{ left:12px; right:12px; bottom:68px; }
+    .export-bar{ top:12px; right:12px; left:auto; bottom:auto; justify-content:center; }
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -720,17 +779,18 @@
 
   .theme-picker{
     position:absolute;
-    top:14px;
+    top:68px;
     right:18px;
     left:auto;
+    flex-direction:column;
   }
 
   .empty-state{
     background:transparent;
     pointer-events:none;
-    align-items:flex-start;
+    align-items:center;
     justify-content:center;
-    padding-top:80px;
+    padding:24px;
   }
   .empty-inner{
     pointer-events:all;
@@ -765,8 +825,9 @@
     .upload-area{ justify-self:stretch; width:100%; }
     .upload-btn{ width:100%; justify-content:center; }
     .meta-row{ gap:10px 18px; }
-    .empty-state{ padding:72px 16px 24px; }
-    .theme-picker{ top:12px; right:12px; }
+    .empty-state{ padding:20px 16px; }
+    .export-bar{ top:12px; right:12px; left:auto; bottom:auto; }
+    .theme-picker{ top:64px; right:12px; flex-direction:column; }
   }
 
 </style>
@@ -816,9 +877,8 @@
   <div class="empty-state" id="empty-state">
     <div class="empty-inner">
       <div class="spinner" id="spinner"></div>
-      <h2 id="empty-title">No track loaded</h2>
-      <p id="empty-text">Load a KML or CSV flight track to draw it on the map.
-        The route will appear color-coded by altitude, with a scrubber below so you can replay the flight.</p>
+      <h2 id="empty-title">Load KML / CSV file</h2>
+      <p id="empty-text">Drop your flight track here, or choose a file from your computer.</p>
       <label class="upload-btn">
         <svg viewBox="0 0 24 24"><path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6h2v6h10v-6h2zM12 2l5 5h-3v6h-4V7H7l5-5z"/></svg>
         <span>Choose a file</span>
@@ -895,6 +955,12 @@
   <div class="scrubber-wrap" id="scrubber-wrap">
     <input type="range" id="scrubber" min="0" max="1" value="0" step="1">
   </div>
+
+  <div class="export-bar" id="export-bar" aria-label="Export current track">
+    <span class="export-label">Export</span>
+    <button class="export-btn" id="export-kml" type="button" title="Export clean KML">KML</button>
+    <button class="export-btn" id="export-g1000" type="button" title="Export G1000 CSV">G1000 CSV</button>
+  </div>
 </main>
 
 <script>
@@ -906,6 +972,7 @@ let polylines = [];
 let marker = null;
 let altMin = 0, altMax = 0;
 let trackBounds = null;
+let currentTailNumber = null;
 
 const MAP_THEMES = {
   dark: {
@@ -913,21 +980,27 @@ const MAP_THEMES = {
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     filter: 'saturate(0.55) brightness(0.85) contrast(1.05)',
     mapBg: '#2a3441',
-    route: 'original'
+    route: 'bordered',
+    casing: '#f5f0e6',
+    casingOpacity: 0.34
   },
   white: {
     label: 'White',
     url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
     filter: 'saturate(0.72) brightness(1.06) contrast(0.94)',
     mapBg: '#e9e5dc',
-    route: 'bold'
+    route: 'bordered',
+    casing: '#1a2332',
+    casingOpacity: 0.55
   },
   night: {
     label: 'Option A',
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     filter: 'saturate(0.75) brightness(1.25) contrast(0.9)',
     mapBg: '#44515e',
-    route: 'bold'
+    route: 'bordered',
+    casing: '#1a2332',
+    casingOpacity: 0.58
   }
 };
 const THEME_ORDER = ['dark', 'white', 'night'];
@@ -1294,29 +1367,35 @@ function redrawTrackSegments(){
   polylines = [];
   if (!FLIGHT.length) return;
 
-  const style = currentRouteStyle();
+  const theme = MAP_THEMES[currentMapTheme] || MAP_THEMES.dark;
+  const fullPath = FLIGHT.map(p => [p[0], p[1]]);
+
+  // One continuous casing behind the color segments keeps the border solid.
+  const casing = L.polyline(fullPath, {
+    color: theme.casing || '#1a2332',
+    weight: 8,
+    opacity: theme.casingOpacity ?? 0.55,
+    lineCap: 'round',
+    lineJoin: 'round'
+  }).addTo(map);
+  polylines.push(casing);
+
+  // Colored altitude segments sit on top of the casing.
   for (let i = 0; i < FLIGHT.length - 1; i++){
     const a = FLIGHT[i], b = FLIGHT[i+1];
     const avgAlt = (a[2]+b[2])/2;
     const latlngs = [[a[0],a[1]],[b[0],b[1]]];
 
-    if (style === 'bold') {
-      const casing = L.polyline(latlngs, {
-        color: '#1a2332', weight: 7, opacity: 0.55
-      }).addTo(map);
-      const line = L.polyline(latlngs, {
-        color: altColor(avgAlt), weight: 4, opacity: 0.96
-      }).addTo(map);
-      polylines.push(casing, line);
-    } else {
-      const line = L.polyline(latlngs, {
-        color: altColor(avgAlt), weight: 3, opacity: 0.85
-      }).addTo(map);
-      polylines.push(line);
-    }
+    const line = L.polyline(latlngs, {
+      color: altColor(avgAlt),
+      weight: 4,
+      opacity: 0.96,
+      lineCap: 'butt',
+      lineJoin: 'round'
+    }).addTo(map);
+    polylines.push(line);
   }
 }
-
 function fitTrackToView(){
   if (!trackBounds) return;
   map.invalidateSize();
@@ -1329,6 +1408,7 @@ function fitTrackToView(){
 function renderTrack(points, tailNumber){
   clearTrack();
   FLIGHT = points;
+  currentTailNumber = tailNumber || null;
 
   const alts = FLIGHT.map(p => p[2]);
   altMin = Math.min(...alts);
@@ -1382,6 +1462,7 @@ function renderTrack(points, tailNumber){
   document.getElementById('legend').classList.add('visible');
   document.getElementById('play').classList.add('visible');
   document.getElementById('fit-track').classList.add('visible');
+  document.getElementById('export-bar').classList.add('visible');
 
   update(0);
 }
@@ -1459,6 +1540,131 @@ playBtn.addEventListener('click', () => playing ? stopPlay() : startPlay());
 fitTrackBtn.addEventListener('click', fitTrackToView);
 themeButtons.forEach(btn => btn.addEventListener('click', () => applyMapTheme(btn.dataset.theme))); 
 applyMapTheme(currentMapTheme);
+
+
+// ===========================================================================
+// Export current track
+// ===========================================================================
+const G1000_HEADER =
+  ' Lcl Date, Lcl Time, UTCOfst, AtvWpt,     Latitude,    Longitude,    AltB, ' +
+  'BaroA,  AltMSL,   OAT,    IAS, GndSpd,    VSpd,  Pitch,   Roll,  LatAc, ' +
+  'NormAc,   HDG,   TRK, volt1,  FQtyL,  FQtyR, E1 FFlow, E1 FPres, E1 OilT, ' +
+  'E1 OilP, E1 MAP, E1 RPM, E1 CHT1, E1 CHT2, E1 CHT3, E1 CHT4, E1 EGT1, ' +
+  'E1 EGT2, E1 EGT3, E1 EGT4,  AltGPS, TAS, HSIS,    CRS,   NAV1,   NAV2,    ' +
+  'COM1,    COM2,   HCDI,   VCDI, WndSpd, WndDr, WptDst, WptBrg, MagVar, ' +
+  'AfcsOn, RollM, PitchM, RollC, PichC, VSpdG, GPSfix,  HAL,   VAL, HPLwas, ' +
+  'HPLfd, VPLwas';
+const G1000_TAIL =
+  ', , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ';
+
+function padLeft(val, width){
+  const s = String(val);
+  return s.length >= width ? s : ' '.repeat(width - s.length) + s;
+}
+
+function exportBaseName(){
+  const raw = (document.getElementById('file-name').textContent || currentTailNumber || 'flight_track')
+    .replace(/\.(kml|csv|txt)$/i, '');
+  return raw.replace(/[^a-zA-Z0-9_.-]+/g, '_') || 'flight_track';
+}
+
+function downloadText(filename, content, mimeType){
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function toG1000CSV(points){
+  const rows = [G1000_HEADER];
+  for (const p of points){
+    const [lat, lon, alt, speed, , iso] = p;
+    const cleaned = iso.replace('Z','');
+    const [date, timeFull = '00:00:00'] = cleaned.split('T');
+    const time = timeFull.split('.')[0];
+
+    const row = `${date}, ${time}, 00:00, , ` +
+      `${padLeft(lat.toFixed(6), 12)}, ${padLeft(lon.toFixed(6), 12)}, , , ` +
+      `${padLeft(Math.round(alt), 7)}, , , ${padLeft(Math.round(Math.max(0,speed)), 6)}` +
+      G1000_TAIL;
+    rows.push(row);
+  }
+  return rows.join('\n');
+}
+
+function toCleanKML(points, tailNumber){
+  const whenCoordLines = points.map(p => {
+    const [lat, lon, altFt] = p;
+    const altM = altFt / 3.28084;
+    return `                <when>${p[5]}</when>\n                <gx:coord>${lon.toFixed(6)} ${lat.toFixed(6)} ${altM.toFixed(1)}</gx:coord>`;
+  }).join('\n                \n');
+
+  const speedValues = points.map(p => `                    <gx:value>${Math.max(0,p[3]).toFixed(2)}</gx:value>`).join('\n                    \n');
+  const courseValues = points.map(p => `                    <gx:value>${p[4].toFixed(2)}</gx:value>`).join('\n                    \n');
+  const first = points[0];
+  const tail = tailNumber || '';
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <open>1</open>
+    <visibility>1</visibility>
+    <Style id="trackStyle">
+      <LineStyle>
+        <color>ffDB9034</color>
+        <width>4</width>
+      </LineStyle>
+    </Style>
+    <Placemark>
+      <name>${tail}</name>
+      <styleUrl>#trackStyle</styleUrl>
+      <gx:Track>
+        <altitudeMode>absolute</altitudeMode>
+        <gx:interpolate>1</gx:interpolate>
+${whenCoordLines}
+        <ExtendedData>
+          <SchemaData>
+            <gx:SimpleArrayData name="speed_kts">
+${speedValues}
+            </gx:SimpleArrayData>
+            <gx:SimpleArrayData name="course">
+${courseValues}
+            </gx:SimpleArrayData>
+          </SchemaData>
+        </ExtendedData>
+      </gx:Track>
+    </Placemark>
+    <Placemark>
+      <name>Start</name>
+      <Point>
+        <coordinates>${first[1].toFixed(6)},${first[0].toFixed(6)},${(first[2]/3.28084).toFixed(1)}</coordinates>
+      </Point>
+    </Placemark>
+    <ExtendedData>
+      <Data name="source"><value>Flight Track Viewer</value></Data>
+      <Data name="tailNumber"><value>${tail}</value></Data>
+    </ExtendedData>
+  </Document>
+</kml>\n`;
+}
+
+function exportCurrentTrack(format){
+  if (!FLIGHT.length) return;
+  const base = exportBaseName();
+  if (format === 'kml') {
+    downloadText(`${base}_track.kml`, toCleanKML(FLIGHT, currentTailNumber), 'application/vnd.google-earth.kml+xml;charset=utf-8');
+  } else if (format === 'g1000') {
+    downloadText(`${base}_G1000.csv`, toG1000CSV(FLIGHT), 'text/csv;charset=utf-8');
+  }
+}
+
+document.getElementById('export-kml').addEventListener('click', () => exportCurrentTrack('kml'));
+document.getElementById('export-g1000').addEventListener('click', () => exportCurrentTrack('g1000'));
 
 // ===========================================================================
 // File handling
