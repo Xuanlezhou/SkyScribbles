@@ -152,10 +152,11 @@
 
   /* ===== Instrument panel ===== */
   .panel{
-    position:absolute;
-    left:24px;
-    bottom:24px;
-    z-index:10;
+    position:fixed;
+    left:50%;
+    bottom:46px;
+    transform:translateX(-50%);
+    z-index:1000;
     background:rgba(26,35,50,0.92);
     backdrop-filter:blur(8px);
     border:1px solid rgba(232,160,76,0.3);
@@ -165,7 +166,8 @@
     align-items:center;
     gap:24px;
     box-shadow:0 8px 32px rgba(0,0,0,0.4);
-    max-width:calc(100vw - 48px);
+    width:min(720px, calc(100vw - 160px));
+    max-width:calc(100vw - 160px);
     opacity:0;
     pointer-events:none;
     transition:opacity 0.25s ease;
@@ -191,11 +193,14 @@
 
   /* ===== Scrubber ===== */
   .scrubber-wrap{
-    position:absolute;
-    left:24px; right:24px; bottom:0;
-    z-index:10;
-    padding:14px 24px 18px;
-    background:linear-gradient(180deg, transparent, rgba(13,17,23,0.85) 40%);
+    position:fixed;
+    left:50%;
+    bottom:12px;
+    transform:translateX(-50%);
+    z-index:1000;
+    width:min(720px, calc(100vw - 160px));
+    padding:0;
+    background:none;
     pointer-events:none;
     opacity:0;
     transition:opacity 0.25s ease;
@@ -236,7 +241,7 @@
 
   /* ===== Play control ===== */
   .play-btn{
-    position:absolute; bottom:24px; right:24px; z-index:10;
+    position:fixed; bottom:24px; right:24px; z-index:1001;
     width:48px;height:48px; border-radius:50%;
     background:var(--amber); border:none;
     display:flex; align-items:center; justify-content:center;
@@ -270,12 +275,23 @@
     .upload-area{ margin-left:0; width:100%; margin-top:10px; }
     .upload-btn{ width:100%; justify-content:center; }
     .panel{
-      left:12px; right:12px; bottom:64px;
+      left:50%;
+      right:auto;
+      bottom:52px;
+      transform:translateX(-50%);
+      width:calc(100vw - 24px);
+      max-width:calc(100vw - 24px);
       flex-direction:column; align-items:flex-start; gap:14px; padding:14px 16px;
     }
     .readouts{grid-template-columns:repeat(3,1fr); gap:10px;}
     .legend{ top:auto; bottom:64px; right:12px; left:12px; }
-    .scrubber-wrap{left:12px; right:12px;}
+    .scrubber-wrap{
+      left:50%;
+      right:auto;
+      bottom:14px;
+      transform:translateX(-50%);
+      width:calc(100vw - 96px);
+    }
     .play-btn{ bottom:12px; right:12px; }
   }
 
