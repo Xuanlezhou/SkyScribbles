@@ -883,6 +883,139 @@
     .theme-picker{ top:64px; right:12px; flex-direction:column; }
   }
 
+
+
+  /* ===== Right-side control stack override =====
+     Order from top to bottom: Export, 2D/3D, Colour theme dots. */
+  .export-bar{
+    top:14px !important;
+    right:18px !important;
+    left:auto !important;
+    bottom:auto !important;
+  }
+
+  .view-toggle{
+    top:64px !important;
+    right:18px !important;
+    left:auto !important;
+    z-index:1001;
+  }
+
+  .theme-picker{
+    top:112px !important;
+    right:18px !important;
+    left:auto !important;
+    flex-direction:column !important;
+  }
+
+  @media (max-width:760px){
+    .export-bar{
+      top:12px !important;
+      right:12px !important;
+      left:auto !important;
+      bottom:auto !important;
+    }
+    .view-toggle{
+      top:62px !important;
+      right:12px !important;
+      left:auto !important;
+    }
+    .theme-picker{
+      top:110px !important;
+      right:12px !important;
+      left:auto !important;
+      flex-direction:column !important;
+    }
+  }
+
+
+
+  /* ===== Fixes: 3D controls + compact mobile instrument panel ===== */
+  @media (max-width:760px){
+    .panel{
+      left:50% !important;
+      right:auto !important;
+      bottom:42px !important;
+      transform:translateX(-50%) !important;
+      width:calc(100vw - 24px) !important;
+      max-width:calc(100vw - 24px) !important;
+      max-height:30vh !important;
+      overflow-y:auto !important;
+      display:grid !important;
+      grid-template-columns:58px minmax(0,1fr) auto !important;
+      align-items:center !important;
+      gap:8px !important;
+      padding:9px 10px !important;
+      border-radius:14px !important;
+    }
+    .gauge-wrap{
+      width:54px !important;
+      height:54px !important;
+    }
+    .gauge-track, .gauge-fill{ stroke-width:7 !important; }
+    .gauge-center .val{ font-size:15px !important; }
+    .gauge-center .unit{ font-size:7px !important; letter-spacing:0.11em !important; }
+    .readouts{
+      width:100% !important;
+      grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+      gap:5px 8px !important;
+      min-width:0 !important;
+    }
+    .readout{ min-width:0 !important; gap:0 !important; }
+    .readout .rlabel{
+      font-size:7.5px !important;
+      letter-spacing:0.10em !important;
+      white-space:nowrap !important;
+      overflow:hidden !important;
+      text-overflow:ellipsis !important;
+    }
+    .readout .rval{
+      font-size:13px !important;
+      line-height:1.12 !important;
+      white-space:nowrap !important;
+      overflow:hidden !important;
+      text-overflow:ellipsis !important;
+    }
+    .readout .rval .small{ font-size:9px !important; }
+    .panel-actions{
+      margin-left:0 !important;
+      display:flex !important;
+      flex-direction:column !important;
+      gap:7px !important;
+      align-items:center !important;
+      justify-content:center !important;
+    }
+    .panel-icon-btn{
+      width:34px !important;
+      height:34px !important;
+      opacity:1;
+    }
+    .panel-icon-btn svg{ width:17px !important; height:17px !important; }
+    .scrubber-wrap{
+      left:50% !important;
+      right:auto !important;
+      bottom:14px !important;
+      transform:translateX(-50%) !important;
+      width:calc(100vw - 24px) !important;
+    }
+  }
+
+  @media (max-width:420px){
+    .panel{
+      grid-template-columns:48px minmax(0,1fr) 32px !important;
+      gap:7px !important;
+      padding:8px !important;
+    }
+    .gauge-wrap{ width:46px !important; height:46px !important; }
+    .gauge-center .val{ font-size:13px !important; }
+    .readout .rlabel{ font-size:6.8px !important; }
+    .readout .rval{ font-size:11.5px !important; }
+    .panel-icon-btn{ width:30px !important; height:30px !important; }
+    .export-bar{ transform:scale(0.86); transform-origin:top right; }
+    .view-toggle{ transform:scale(0.88); transform-origin:top right; }
+    .theme-picker{ transform:scale(0.90); transform-origin:top right; }
+  }
+
 </style>
 </head>
 <body data-map-theme="dark">
@@ -1170,11 +1303,32 @@ function renderSpaceView(){
   renderer.render(scene, camera);
 }
 
+function fitSpaceCameraToPoints(points){
+  if (!spaceView || !points || !points.length) return;
+
+  const box = new THREE.Box3().setFromPoints(points);
+  const sphere = new THREE.Sphere();
+  box.getBoundingSphere(sphere);
+
+  const aspect = Math.max(0.35, spaceView.camera.aspect || 1);
+  const vFov = THREE.MathUtils.degToRad(spaceView.camera.fov || 45);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+
+  // Fit the whole floor + 3D path into view. Narrow mobile screens need more distance.
+  const distV = sphere.radius / Math.sin(vFov / 2);
+  const distH = sphere.radius / Math.sin(hFov / 2);
+  const fitDistance = Math.max(distV, distH) * 1.08;
+
+  spaceView.target.copy(sphere.center);
+  spaceView.distance = Math.max(12, Math.min(95, fitDistance));
+  spaceView.fitDistance = spaceView.distance;
+}
+
 function resetSpaceCamera(){
   if (!spaceView) return;
   spaceView.yaw = -0.72;
   spaceView.pitch = 0.72;
-  spaceView.distance = 24;
+  spaceView.distance = spaceView.fitDistance || 24;
   renderSpaceView();
 }
 
@@ -1184,7 +1338,13 @@ function clearSpaceGroup(){
     const obj = spaceView.group.children.pop();
     obj.traverse?.(child => {
       if (child.geometry) child.geometry.dispose();
-      if (child.material) child.material.dispose();
+      if (child.material) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach(mat => {
+          if (mat.map) mat.map.dispose();
+          mat.dispose();
+        });
+      }
     });
   }
   spaceView.aircraft = null;
@@ -1208,6 +1368,149 @@ function makeCylinderBetween(a, b, radius, color, opacity=1){
   mesh.position.copy(mid);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
   return mesh;
+}
+
+
+function lonLatToTileXY(lon, lat, zoom){
+  const latRad = lat * Math.PI / 180;
+  const n = 2 ** zoom;
+  const x = (lon + 180) / 360 * n;
+  const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+  return { x, y };
+}
+
+function tileXYToLonLat(x, y, zoom){
+  const n = 2 ** zoom;
+  const lon = x / n * 360 - 180;
+  const latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n)));
+  const lat = latRad * 180 / Math.PI;
+  return { lon, lat };
+}
+
+function tileUrlForTheme(x, y, z){
+  const theme = MAP_THEMES[currentMapTheme] || MAP_THEMES.dark;
+  const subdomains = ['a', 'b', 'c', 'd'];
+  const s = subdomains[Math.abs(x + y) % subdomains.length];
+  return theme.url
+    .replace('{s}', s)
+    .replace('{z}', z)
+    .replace('{x}', x)
+    .replace('{y}', y)
+    .replace('{r}', '');
+}
+
+function chooseTileZoom(latMinLocal, latMaxLocal, lonMinLocal, lonMaxLocal){
+  // Pick the sharpest zoom that still keeps the number of map tiles reasonable.
+  // Higher = more detailed, but too many tiles can make the 3D view sluggish.
+  const maxTiles = 72;
+  for (let z = 16; z >= 3; z--){
+    const nw = lonLatToTileXY(lonMinLocal, latMaxLocal, z);
+    const se = lonLatToTileXY(lonMaxLocal, latMinLocal, z);
+    const x0 = Math.floor(Math.min(nw.x, se.x));
+    const x1 = Math.floor(Math.max(nw.x, se.x));
+    const y0 = Math.floor(Math.min(nw.y, se.y));
+    const y1 = Math.floor(Math.max(nw.y, se.y));
+    const count = (x1 - x0 + 1) * (y1 - y0 + 1);
+    if (count <= maxTiles) return z;
+  }
+  return 3;
+}
+
+function addSingleColourTrackShadow(raw, hScale){
+  if (!spaceView || raw.length < 2) return;
+  const points = raw.map(p => new THREE.Vector3(p.x * hScale, 0.038, p.z * hScale));
+  const geom = new THREE.BufferGeometry().setFromPoints(points);
+  const mat = new THREE.LineBasicMaterial({
+    color: currentMapTheme === 'white' ? 0x6f7478 : 0xa8adb2,
+    transparent: true,
+    opacity: currentMapTheme === 'white' ? 0.50 : 0.42
+  });
+  const shadow = new THREE.Line(geom, mat);
+  spaceView.group.add(shadow);
+}
+
+function addLiveTileMapFloor(raw, hScale, lat0, lon0, metersPerDeg, cosLat){
+  if (!spaceView || !raw.length) return;
+
+  const lats = raw.map(p => p.lat);
+  const lons = raw.map(p => p.lon);
+  let latMinLocal = Math.min(...lats), latMaxLocal = Math.max(...lats);
+  let lonMinLocal = Math.min(...lons), lonMaxLocal = Math.max(...lons);
+
+  // Add padding so the aircraft path is not sitting right on the edge of the tile floor.
+  const latPad = Math.max(0.003, (latMaxLocal - latMinLocal) * 0.22);
+  const lonPad = Math.max(0.003, (lonMaxLocal - lonMinLocal) * 0.22);
+  latMinLocal = Math.max(-85, latMinLocal - latPad);
+  latMaxLocal = Math.min(85, latMaxLocal + latPad);
+  lonMinLocal = Math.max(-180, lonMinLocal - lonPad);
+  lonMaxLocal = Math.min(180, lonMaxLocal + lonPad);
+
+  const zoom = chooseTileZoom(latMinLocal, latMaxLocal, lonMinLocal, lonMaxLocal);
+  const nw = lonLatToTileXY(lonMinLocal, latMaxLocal, zoom);
+  const se = lonLatToTileXY(lonMaxLocal, latMinLocal, zoom);
+  const x0 = Math.floor(Math.min(nw.x, se.x));
+  const x1 = Math.floor(Math.max(nw.x, se.x));
+  const y0 = Math.floor(Math.min(nw.y, se.y));
+  const y1 = Math.floor(Math.max(nw.y, se.y));
+
+  const toWorld = (lat, lon) => new THREE.Vector3(
+    (lon - lon0) * metersPerDeg * cosLat * hScale,
+    0,
+    -(lat - lat0) * metersPerDeg * hScale
+  );
+
+  const placeholderCanvas = document.createElement('canvas');
+  placeholderCanvas.width = 16;
+  placeholderCanvas.height = 16;
+  const pctx = placeholderCanvas.getContext('2d');
+  pctx.fillStyle = currentMapTheme === 'white' ? '#e9e5dc' : '#182231';
+  pctx.fillRect(0, 0, 16, 16);
+  const placeholder = new THREE.CanvasTexture(placeholderCanvas);
+
+  const loader = new THREE.TextureLoader();
+  loader.setCrossOrigin('anonymous');
+
+  for (let x = x0; x <= x1; x++){
+    for (let y = y0; y <= y1; y++){
+      const topLeft = tileXYToLonLat(x, y, zoom);
+      const bottomRight = tileXYToLonLat(x + 1, y + 1, zoom);
+      const a = toWorld(topLeft.lat, topLeft.lon);
+      const b = toWorld(bottomRight.lat, bottomRight.lon);
+
+      const width = Math.abs(b.x - a.x);
+      const depth = Math.abs(b.z - a.z);
+      if (width <= 0.0001 || depth <= 0.0001) continue;
+
+      const geom = new THREE.PlaneGeometry(width, depth, 1, 1);
+      const mat = new THREE.MeshBasicMaterial({
+        map: placeholder.clone(),
+        transparent: true,
+        opacity: currentMapTheme === 'white' ? 0.92 : 0.82,
+        side: THREE.DoubleSide
+      });
+      const tile = new THREE.Mesh(geom, mat);
+      tile.rotation.x = -Math.PI / 2;
+      tile.position.set((a.x + b.x) / 2, -0.018, (a.z + b.z) / 2);
+      spaceView.group.add(tile);
+
+      loader.load(
+        tileUrlForTheme(x, y, zoom),
+        texture => {
+          texture.anisotropy = Math.min(8, spaceView.renderer.capabilities.getMaxAnisotropy?.() || 1);
+          texture.needsUpdate = true;
+          if (mat.map) mat.map.dispose();
+          mat.map = texture;
+          mat.needsUpdate = true;
+          renderSpaceView();
+        },
+        undefined,
+        () => {
+          // If a tile provider blocks a texture request, keep the neutral placeholder.
+          renderSpaceView();
+        }
+      );
+    }
+  }
 }
 
 function buildSpaceTrack(){
@@ -1238,10 +1541,10 @@ function buildSpaceTrack(){
   );
   spaceView.converter = converter;
 
-  const grid = new THREE.GridHelper(26, 26, 0x5b8a9a, 0x263443);
-  grid.material.transparent = true;
-  grid.material.opacity = 0.38;
-  group.add(grid);
+  // Live slippy-map tile floor under the 3D track.
+  // This uses the same CARTO/OSM tile source as the 2D Leaflet map.
+  addLiveTileMapFloor(raw, hScale, lat0, lon0, metersPerDeg, cosLat);
+  addSingleColourTrackShadow(raw, hScale);
 
   // 3D view: render every point from the source data.
   // Previously this was capped to ~600 displayed points with sampleStep,
@@ -1279,6 +1582,11 @@ function buildSpaceTrack(){
   aircraft.position.copy(end);
   group.add(aircraft);
   spaceView.aircraft = aircraft;
+
+  // Include both the raised 3D path and the flat tile floor in the camera fit,
+  // otherwise the map/track can look cropped at the left/right edges.
+  const cameraFitPoints = pts.concat(raw.map(p => new THREE.Vector3(p.x * hScale, 0, p.z * hScale)));
+  fitSpaceCameraToPoints(cameraFitPoints);
   renderSpaceView();
 }
 
@@ -1309,6 +1617,15 @@ function applyMapTheme(themeKey){
     btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
   });
   redrawTrackSegments();
+
+  // The 3D map floor is made from textures, so it must be rebuilt when the
+  // theme changes. This keeps the colour buttons working in 3D mode too.
+  if (currentViewMode === 'space' && FLIGHT.length) {
+    buildSpaceTrack();
+    update(parseInt(document.getElementById('scrubber').value || 0));
+  } else {
+    renderSpaceView();
+  }
 }
 
 function cycleMapTheme(){
@@ -1735,7 +2052,7 @@ function renderTrack(points, tailNumber){
   setMeta('m-dur', durStr);
 
   // show controls
-  document.getElementById('empty-state').classList.add('hidden');
+  hideEmptyOverlay();
   document.getElementById('panel').classList.add('visible');
   document.getElementById('scrubber-wrap').classList.add('visible');
   document.getElementById('legend').classList.add('visible');
@@ -1951,15 +2268,38 @@ function exportCurrentTrack(format){
 document.getElementById('export-kml').addEventListener('click', () => exportCurrentTrack('kml'));
 document.getElementById('export-g1000').addEventListener('click', () => exportCurrentTrack('g1000'));
 
+
+// ===========================================================================
+// Empty/load overlay helpers
+// ===========================================================================
+function showEmptyOverlay(title='Load KML / CSV file', text='Drop your flight track here, or choose a file from your computer.', isLoading=false){
+  const emptyState = document.getElementById('empty-state');
+  const spinner = document.getElementById('spinner');
+  const titleEl = document.getElementById('empty-title');
+  const textEl = document.getElementById('empty-text');
+  const errorEl = document.getElementById('empty-error');
+
+  emptyState.classList.remove('hidden');
+  titleEl.textContent = title;
+  textEl.textContent = text;
+  textEl.style.display = isLoading ? 'none' : '';
+  spinner.classList.toggle('visible', isLoading);
+  errorEl.style.display = 'none';
+}
+
+function hideEmptyOverlay(){
+  const emptyState = document.getElementById('empty-state');
+  const spinner = document.getElementById('spinner');
+  emptyState.classList.add('hidden');
+  spinner.classList.remove('visible');
+}
+
 // ===========================================================================
 // File handling
 // ===========================================================================
 function handleFile(file){
   const errorEl = document.getElementById('empty-error');
-  errorEl.style.display = 'none';
-  document.getElementById('spinner').classList.add('visible');
-  document.getElementById('empty-title').textContent = 'Loading…';
-  document.getElementById('empty-text').style.display = 'none';
+  showEmptyOverlay('Loading…', '', true);
 
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -1982,11 +2322,11 @@ function handleFile(file){
       document.getElementById('file-name').textContent = file.name;
       renderTrack(result.points, result.tailNumber);
     } catch (err) {
-      document.getElementById('spinner').classList.remove('visible');
-      document.getElementById('empty-title').textContent = 'Could not read this file';
-      document.getElementById('empty-text').style.display = '';
-      document.getElementById('empty-text').textContent =
-        'Upload a ForeFlight/Garmin KML track log, a G1000-format CSV, or a FlightRadar24-style CSV.';
+      showEmptyOverlay(
+        'Could not read this file',
+        'Upload a ForeFlight/Garmin KML track log, a G1000-format CSV, or a FlightRadar24-style CSV.',
+        false
+      );
       errorEl.textContent = err.message;
       errorEl.style.display = 'block';
     }
