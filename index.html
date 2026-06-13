@@ -19,8 +19,8 @@
     --red:#d9534f;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{height:100%;font-family:'Space Mono',monospace;background:var(--navy);color:var(--cream);}
-  body{ display:flex; flex-direction:column; overflow:hidden; }
+  html,body{height:100vh;font-family:'Space Mono',monospace;background:var(--navy);color:var(--cream);}
+  body{ display:flex; flex-direction:column; overflow:hidden; min-height:0; }
 
   /* ===== Header ===== */
   header{
@@ -108,10 +108,10 @@
   #map{
     position:absolute;
     inset:0;
-    background:#0d1117;
+    background:#2a3441;
   }
   .leaflet-tile-pane{ filter: saturate(0.55) brightness(0.85) contrast(1.05); }
-  .leaflet-container{ background:#0d1117; font-family:'Space Mono',monospace; }
+  .leaflet-container{ background:#2a3441; font-family:'Space Mono',monospace; }
 
   /* ===== Empty state ===== */
   .empty-state{
@@ -122,7 +122,7 @@
     align-items:center;
     justify-content:center;
     text-align:center;
-    background:#0d1117;
+    background:#2a3441;
     padding:24px;
   }
   .empty-state.hidden{ display:none; }
@@ -571,6 +571,8 @@ let marker = null;
 let altMin = 0, altMax = 0;
 
 const map = L.map('map', { zoomControl: true, attributionControl: true, center:[39.8,-98.5], zoom: 4 });
+window.addEventListener('resize', () => map.invalidateSize());
+setTimeout(() => map.invalidateSize(), 100);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
   attribution: '&copy; OpenStreetMap &copy; CARTO',
   maxZoom: 18
@@ -852,6 +854,7 @@ function renderTrack(points, tailNumber){
     bounds.push([a[0],a[1]]);
   }
   bounds.push([FLIGHT[FLIGHT.length-1][0], FLIGHT[FLIGHT.length-1][1]]);
+  map.invalidateSize();
   map.fitBounds(bounds, { padding: [40,40] });
 
   const planeIcon = L.divIcon({
