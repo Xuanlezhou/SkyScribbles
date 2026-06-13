@@ -20,10 +20,12 @@
   }
   *{margin:0;padding:0;box-sizing:border-box;}
   html,body{height:100%;font-family:'Space Mono',monospace;background:var(--navy);color:var(--cream);}
+  body{ display:flex; flex-direction:column; overflow:hidden; }
 
   /* ===== Header ===== */
   header{
     position:relative;
+    flex:0 0 auto;
     padding:24px 32px 20px;
     background:linear-gradient(180deg, var(--navy) 0%, #141b27 100%);
     border-bottom:1px solid rgba(232,160,76,0.25);
@@ -100,8 +102,8 @@
   /* ===== Main layout ===== */
   main{
     position:relative;
-    height:calc(100vh - 132px);
-    min-height:480px;
+    flex:1 1 auto;
+    min-height:0;
   }
   #map{
     position:absolute;
@@ -309,12 +311,12 @@
   .tab-btn:hover{ color:var(--cream); }
 
   .view{ display:none; }
-  .view.active{ display:block; }
+  .view.active{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
 
   /* ===== Batch export view ===== */
   #batch-view{
-    height:calc(100vh - 132px);
-    min-height:480px;
+    flex:1 1 auto;
+    min-height:0;
     overflow-y:auto;
     padding:40px 32px;
   }
