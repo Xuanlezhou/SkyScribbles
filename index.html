@@ -5,8 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Flight Track Viewer</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js">
+
+// Make sure the upload prompt is visible on a fresh page load before any track is loaded.
+if (!FLIGHT.length) {
+  showEmptyOverlay();
+}
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js">
+
+// Make sure the upload prompt is visible on a fresh page load before any track is loaded.
+if (!FLIGHT.length) {
+  showEmptyOverlay();
+}
+
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@400;600;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -1016,6 +1030,74 @@
     .theme-picker{ transform:scale(0.90); transform-origin:top right; }
   }
 
+
+
+  /* ===== Final polish: keep controls clear of zoom + restore initial overlay ===== */
+  /* Push Leaflet zoom away from the top controls so the 2D/3D pill never sits on top of it. */
+  .leaflet-top.leaflet-left{
+    top:76px !important;
+    left:18px !important;
+  }
+  body[data-view-mode="space"] .leaflet-control-zoom{
+    display:none !important;
+  }
+
+  /* A little more breathing room in the right-side stack. */
+  .export-bar{
+    top:14px !important;
+    right:18px !important;
+  }
+  .view-toggle{
+    top:76px !important;
+    right:18px !important;
+    left:auto !important;
+  }
+  .theme-picker{
+    top:130px !important;
+    right:18px !important;
+    left:auto !important;
+    flex-direction:column !important;
+  }
+
+  /* Make the initial upload overlay reliably visible before any file is loaded. */
+  .empty-state{
+    z-index:1200 !important;
+  }
+  .empty-state.hidden{
+    display:none !important;
+  }
+  .empty-state:not(.hidden) ~ .legend,
+  .empty-state:not(.hidden) ~ .panel,
+  .empty-state:not(.hidden) ~ .scrubber-wrap,
+  .empty-state:not(.hidden) ~ .export-bar{
+    opacity:0 !important;
+    pointer-events:none !important;
+  }
+
+  @media (max-width:760px){
+    .leaflet-top.leaflet-left{
+      top:70px !important;
+      left:12px !important;
+    }
+    .export-bar{
+      top:10px !important;
+      right:10px !important;
+    }
+    .view-toggle{
+      top:68px !important;
+      right:10px !important;
+      left:auto !important;
+    }
+    .theme-picker{
+      top:122px !important;
+      right:10px !important;
+      left:auto !important;
+    }
+    .empty-inner{
+      max-width:min(440px, calc(100vw - 32px));
+    }
+  }
+
 </style>
 </head>
 <body data-map-theme="dark">
@@ -1235,16 +1317,10 @@ function initSpaceView(){
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x080d14, 18, 42);
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
   const group = new THREE.Group();
   scene.add(group);
 
-  const hemi = new THREE.HemisphereLight(0xf5f0e6, 0x1a2332, 1.0);
-  scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xe8a04c, 0.8);
-  key.position.set(6, 12, 8);
-  scene.add(key);
 
   spaceView = {
     canvas, renderer, scene, camera, group,
@@ -1284,7 +1360,7 @@ function initSpaceView(){
   canvas.addEventListener('pointerup', () => { spaceView.isDragging = false; });
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
-    spaceView.distance = Math.max(9, Math.min(55, spaceView.distance + e.deltaY * 0.018));
+    spaceView.distance = Math.max(9, Math.min(120, spaceView.distance + e.deltaY * 0.018));
     renderSpaceView();
   }, { passive:false });
 
@@ -1320,7 +1396,7 @@ function fitSpaceCameraToPoints(points){
   const fitDistance = Math.max(distV, distH) * 1.08;
 
   spaceView.target.copy(sphere.center);
-  spaceView.distance = Math.max(12, Math.min(95, fitDistance));
+  spaceView.distance = Math.max(12, Math.min(120, fitDistance));
   spaceView.fitDistance = spaceView.distance;
 }
 
@@ -1357,12 +1433,10 @@ function makeCylinderBetween(a, b, radius, color, opacity=1){
   const len = dir.length();
   if (len <= 0.0001) return null;
   const geom = new THREE.CylinderGeometry(radius, radius, len, 8, 1, true);
-  const mat = new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshBasicMaterial({
     color,
     transparent: opacity < 1,
-    opacity,
-    roughness:0.55,
-    metalness:0.08
+    opacity
   });
   const mesh = new THREE.Mesh(geom, mat);
   mesh.position.copy(mid);
@@ -1402,7 +1476,7 @@ function tileUrlForTheme(x, y, z){
 function chooseTileZoom(latMinLocal, latMaxLocal, lonMinLocal, lonMaxLocal){
   // Pick the sharpest zoom that still keeps the number of map tiles reasonable.
   // Higher = more detailed, but too many tiles can make the 3D view sluggish.
-  const maxTiles = 72;
+  const maxTiles = 144;
   for (let z = 16; z >= 3; z--){
     const nw = lonLatToTileXY(lonMinLocal, latMaxLocal, z);
     const se = lonLatToTileXY(lonMaxLocal, latMinLocal, z);
@@ -1437,9 +1511,13 @@ function addLiveTileMapFloor(raw, hScale, lat0, lon0, metersPerDeg, cosLat){
   let latMinLocal = Math.min(...lats), latMaxLocal = Math.max(...lats);
   let lonMinLocal = Math.min(...lons), lonMaxLocal = Math.max(...lons);
 
-  // Add padding so the aircraft path is not sitting right on the edge of the tile floor.
-  const latPad = Math.max(0.003, (latMaxLocal - latMinLocal) * 0.22);
-  const lonPad = Math.max(0.003, (lonMaxLocal - lonMinLocal) * 0.22);
+  // Oversize the map floor aggressively so the finite slippy-map tile rectangle
+  // sits far outside the camera view. This is still a flat local map, not a globe;
+  // the padding keeps the rectangular tile boundary from showing on screen.
+  const latRange = Math.max(0.0008, latMaxLocal - latMinLocal);
+  const lonRange = Math.max(0.0008, lonMaxLocal - lonMinLocal);
+  const latPad = Math.max(0.18, latRange * 8.0);
+  const lonPad = Math.max(0.18, lonRange * 8.0);
   latMinLocal = Math.max(-85, latMinLocal - latPad);
   latMaxLocal = Math.min(85, latMaxLocal + latPad);
   lonMinLocal = Math.max(-180, lonMinLocal - lonPad);
@@ -1484,8 +1562,8 @@ function addLiveTileMapFloor(raw, hScale, lat0, lon0, metersPerDeg, cosLat){
       const geom = new THREE.PlaneGeometry(width, depth, 1, 1);
       const mat = new THREE.MeshBasicMaterial({
         map: placeholder.clone(),
-        transparent: true,
-        opacity: currentMapTheme === 'white' ? 0.92 : 0.82,
+        transparent: false,
+        opacity: 1,
         side: THREE.DoubleSide
       });
       const tile = new THREE.Mesh(geom, mat);
@@ -1544,7 +1622,6 @@ function buildSpaceTrack(){
   // Live slippy-map tile floor under the 3D track.
   // This uses the same CARTO/OSM tile source as the 2D Leaflet map.
   addLiveTileMapFloor(raw, hScale, lat0, lon0, metersPerDeg, cosLat);
-  addSingleColourTrackShadow(raw, hScale);
 
   // 3D view: render every point from the source data.
   // Previously this was capped to ~600 displayed points with sampleStep,
@@ -1559,34 +1636,26 @@ function buildSpaceTrack(){
     if (seg) group.add(seg);
   }
 
-  const postMat = new THREE.LineBasicMaterial({ color:0x8fa4aa, transparent:true, opacity:0.24 });
-  for (let i=0; i<pts.length; i += Math.max(8, Math.floor(pts.length / 45))){
-    const p = pts[i];
-    const geom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p.x,0,p.z), p]);
-    group.add(new THREE.Line(geom, postMat));
-  }
-
   const start = pts[0];
   const end = pts[pts.length-1];
   const startDot = new THREE.Mesh(
     new THREE.SphereGeometry(0.12, 16, 16),
-    new THREE.MeshStandardMaterial({ color:0x5b8a9a })
+    new THREE.MeshBasicMaterial({ color:0x5b8a9a })
   );
   startDot.position.copy(start);
   group.add(startDot);
 
   const aircraft = new THREE.Mesh(
     new THREE.SphereGeometry(0.22, 24, 24),
-    new THREE.MeshStandardMaterial({ color:0xe8a04c, emissive:0x2b1903, roughness:0.35 })
+    new THREE.MeshBasicMaterial({ color:0xe8a04c })
   );
   aircraft.position.copy(end);
   group.add(aircraft);
   spaceView.aircraft = aircraft;
 
-  // Include both the raised 3D path and the flat tile floor in the camera fit,
-  // otherwise the map/track can look cropped at the left/right edges.
-  const cameraFitPoints = pts.concat(raw.map(p => new THREE.Vector3(p.x * hScale, 0, p.z * hScale)));
-  fitSpaceCameraToPoints(cameraFitPoints);
+  // Fit the camera to the flight path only. The live tile floor is deliberately
+  // oversized, so it extends beyond the screen edges instead of being framed/cropped.
+  fitSpaceCameraToPoints(pts);
   renderSpaceView();
 }
 
@@ -2279,12 +2348,15 @@ function showEmptyOverlay(title='Load KML / CSV file', text='Drop your flight tr
   const textEl = document.getElementById('empty-text');
   const errorEl = document.getElementById('empty-error');
 
+  if (!emptyState) return;
   emptyState.classList.remove('hidden');
-  titleEl.textContent = title;
-  textEl.textContent = text;
-  textEl.style.display = isLoading ? 'none' : '';
-  spinner.classList.toggle('visible', isLoading);
-  errorEl.style.display = 'none';
+  if (titleEl) titleEl.textContent = title;
+  if (textEl) {
+    textEl.textContent = text;
+    textEl.style.display = isLoading ? 'none' : '';
+  }
+  if (spinner) spinner.classList.toggle('visible', isLoading);
+  if (errorEl) errorEl.style.display = 'none';
 }
 
 function hideEmptyOverlay(){
@@ -2332,7 +2404,11 @@ function handleFile(file){
     }
   };
   reader.onerror = () => {
-    document.getElementById('spinner').classList.remove('visible');
+    showEmptyOverlay(
+      'Could not read this file',
+      'Try choosing the file again, or export it as KML / CSV once more.',
+      false
+    );
     errorEl.textContent = 'Could not read the file from disk.';
     errorEl.style.display = 'block';
   };
@@ -2354,6 +2430,13 @@ const viewerViewEl = document.getElementById('viewer-view');
 viewerViewEl.addEventListener('drop', e => {
   if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
 });
+
+
+// Make sure the upload prompt is visible on a fresh page load before any track is loaded.
+if (!FLIGHT.length) {
+  showEmptyOverlay();
+}
+
 </script>
 
 </body>
