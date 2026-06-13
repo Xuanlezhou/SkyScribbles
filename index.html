@@ -6,6 +6,7 @@
 <title>Flight Track Viewer</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@400;600;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -110,6 +111,19 @@
     inset:0;
     background:#2a3441;
   }
+  #space-viewer{
+    position:absolute;
+    inset:0;
+    z-index:2;
+    display:none;
+    width:100%;
+    height:100%;
+    background:radial-gradient(circle at 50% 35%, #33465a 0%, #101721 58%, #080d14 100%);
+    cursor:grab;
+  }
+  #space-viewer:active{ cursor:grabbing; }
+  body[data-view-mode="space"] #space-viewer{ display:block; }
+  body[data-view-mode="space"] #map{ visibility:hidden; }
   .leaflet-tile-pane{ filter: saturate(0.55) brightness(0.85) contrast(1.05); }
   .leaflet-container{ background:#2a3441; font-family:'Space Mono',monospace; }
 
@@ -236,6 +250,44 @@
   .legend .ltitle{ letter-spacing:0.18em; text-transform:uppercase; color:var(--taxiway); margin-bottom:8px; font-size:10px;}
   .gradient-bar{ width:140px; height:8px; border-radius:4px; background:linear-gradient(90deg, #5b8a9a, #e8a04c, #d9534f); margin-bottom:4px; }
   .gradient-labels{ display:flex; justify-content:space-between; color:var(--cream); opacity:0.8; }
+
+  /* ===== 2D / 3D view toggle ===== */
+  .view-toggle{
+    position:absolute;
+    top:14px;
+    left:18px;
+    z-index:1001;
+    display:flex;
+    gap:4px;
+    padding:5px;
+    border-radius:999px;
+    background:rgba(26,35,50,0.78);
+    border:1px solid rgba(232,160,76,0.25);
+    backdrop-filter:blur(8px);
+    box-shadow:0 6px 24px rgba(0,0,0,0.24);
+  }
+  .view-mode-btn{
+    border:0;
+    border-radius:999px;
+    padding:7px 11px;
+    background:transparent;
+    color:var(--taxiway);
+    font-family:'Space Mono',monospace;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition:background 0.15s ease, color 0.15s ease;
+  }
+  .view-mode-btn.active{
+    background:rgba(232,160,76,0.16);
+    color:var(--amber);
+  }
+  body[data-map-theme="white"] .view-toggle{
+    background:rgba(245,240,230,0.78);
+    border-color:rgba(26,35,50,0.16);
+  }
 
   /* ===== Compact map theme picker ===== */
   .theme-picker{
@@ -826,6 +878,7 @@
     .upload-btn{ width:100%; justify-content:center; }
     .meta-row{ gap:10px 18px; }
     .empty-state{ padding:20px 16px; }
+    .view-toggle{ top:12px; left:12px; }
     .export-bar{ top:12px; right:12px; left:auto; bottom:auto; }
     .theme-picker{ top:64px; right:12px; flex-direction:column; }
   }
@@ -868,6 +921,11 @@
 
 <main class="view active" id="viewer-view">
   <div id="map"></div>
+  <canvas id="space-viewer" aria-label="3D flight path view"></canvas>
+  <div class="view-toggle" id="view-toggle" aria-label="View mode">
+    <button class="view-mode-btn active" type="button" data-view-mode="map" aria-pressed="true">2D</button>
+    <button class="view-mode-btn" type="button" data-view-mode="space" aria-pressed="false">3D</button>
+  </div>
   <div class="theme-picker" id="theme-picker" aria-label="Map theme">
     <button class="theme-dot theme-dot-dark active" type="button" data-theme="dark" title="Original dark map" aria-label="Original dark map" aria-pressed="true"></button>
     <button class="theme-dot theme-dot-white" type="button" data-theme="white" title="White map" aria-label="White map" aria-pressed="false"></button>
@@ -973,6 +1031,8 @@ let marker = null;
 let altMin = 0, altMax = 0;
 let trackBounds = null;
 let currentTailNumber = null;
+let currentViewMode = 'map';
+let spaceView = null;
 
 const MAP_THEMES = {
   dark: {
@@ -1005,6 +1065,7 @@ const MAP_THEMES = {
 };
 const THEME_ORDER = ['dark', 'white', 'night'];
 let currentMapTheme = 'dark';
+document.body.dataset.viewMode = currentViewMode;
 
 const map = L.map('map', { zoomControl: true, attributionControl: true, center:[39.8,-98.5], zoom: 4 });
 window.addEventListener('resize', () => map.invalidateSize());
@@ -1013,6 +1074,221 @@ const tileLayer = L.tileLayer(MAP_THEMES[currentMapTheme].url, {
   attribution: '&copy; OpenStreetMap &copy; CARTO',
   maxZoom: 18
 }).addTo(map);
+
+// ===========================================================================
+// 2D / 3D view mode
+// ===========================================================================
+function applyViewMode(mode){
+  currentViewMode = mode === 'space' ? 'space' : 'map';
+  document.body.dataset.viewMode = currentViewMode;
+  document.querySelectorAll('.view-mode-btn').forEach(btn => {
+    const isActive = btn.dataset.viewMode === currentViewMode;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+
+  if (currentViewMode === 'space') {
+    initSpaceView();
+    buildSpaceTrack();
+    if (FLIGHT.length) update(parseInt(scrubber.value || 0));
+  } else {
+    map.invalidateSize();
+  }
+}
+
+function initSpaceView(){
+  if (spaceView || !window.THREE) return;
+  const canvas = document.getElementById('space-viewer');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x080d14, 18, 42);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+  const group = new THREE.Group();
+  scene.add(group);
+
+  const hemi = new THREE.HemisphereLight(0xf5f0e6, 0x1a2332, 1.0);
+  scene.add(hemi);
+  const key = new THREE.DirectionalLight(0xe8a04c, 0.8);
+  key.position.set(6, 12, 8);
+  scene.add(key);
+
+  spaceView = {
+    canvas, renderer, scene, camera, group,
+    yaw:-0.72, pitch:0.72, distance:24,
+    target:new THREE.Vector3(0,3,0),
+    converter:null, aircraft:null,
+    isDragging:false, lastX:0, lastY:0
+  };
+
+  const resize = () => {
+    const w = canvas.clientWidth || canvas.parentElement.clientWidth;
+    const h = canvas.clientHeight || canvas.parentElement.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / Math.max(1, h);
+    camera.updateProjectionMatrix();
+    renderSpaceView();
+  };
+  window.addEventListener('resize', resize);
+  resize();
+
+  canvas.addEventListener('pointerdown', e => {
+    spaceView.isDragging = true;
+    spaceView.lastX = e.clientX;
+    spaceView.lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!spaceView.isDragging) return;
+    const dx = e.clientX - spaceView.lastX;
+    const dy = e.clientY - spaceView.lastY;
+    spaceView.lastX = e.clientX;
+    spaceView.lastY = e.clientY;
+    spaceView.yaw -= dx * 0.006;
+    spaceView.pitch = Math.max(0.18, Math.min(1.35, spaceView.pitch + dy * 0.006));
+    renderSpaceView();
+  });
+  canvas.addEventListener('pointerup', () => { spaceView.isDragging = false; });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    spaceView.distance = Math.max(9, Math.min(55, spaceView.distance + e.deltaY * 0.018));
+    renderSpaceView();
+  }, { passive:false });
+
+  renderSpaceView();
+}
+
+function renderSpaceView(){
+  if (!spaceView) return;
+  const { camera, renderer, scene, target, yaw, pitch, distance } = spaceView;
+  camera.position.set(
+    target.x + Math.cos(yaw) * Math.cos(pitch) * distance,
+    target.y + Math.sin(pitch) * distance,
+    target.z + Math.sin(yaw) * Math.cos(pitch) * distance
+  );
+  camera.lookAt(target);
+  renderer.render(scene, camera);
+}
+
+function resetSpaceCamera(){
+  if (!spaceView) return;
+  spaceView.yaw = -0.72;
+  spaceView.pitch = 0.72;
+  spaceView.distance = 24;
+  renderSpaceView();
+}
+
+function clearSpaceGroup(){
+  if (!spaceView) return;
+  while (spaceView.group.children.length) {
+    const obj = spaceView.group.children.pop();
+    obj.traverse?.(child => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) child.material.dispose();
+    });
+  }
+  spaceView.aircraft = null;
+  spaceView.converter = null;
+}
+
+function makeCylinderBetween(a, b, radius, color, opacity=1){
+  const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5);
+  const dir = new THREE.Vector3().subVectors(b, a);
+  const len = dir.length();
+  if (len <= 0.0001) return null;
+  const geom = new THREE.CylinderGeometry(radius, radius, len, 8, 1, true);
+  const mat = new THREE.MeshStandardMaterial({
+    color,
+    transparent: opacity < 1,
+    opacity,
+    roughness:0.55,
+    metalness:0.08
+  });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.position.copy(mid);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+  return mesh;
+}
+
+function buildSpaceTrack(){
+  if (!FLIGHT.length || !window.THREE) return;
+  initSpaceView();
+  clearSpaceGroup();
+
+  const group = spaceView.group;
+  const lat0 = FLIGHT.reduce((s,p)=>s+p[0],0) / FLIGHT.length;
+  const lon0 = FLIGHT.reduce((s,p)=>s+p[1],0) / FLIGHT.length;
+  const cosLat = Math.cos(lat0 * Math.PI / 180);
+  const metersPerDeg = 111320;
+  const raw = FLIGHT.map(p => ({
+    x:(p[1]-lon0) * metersPerDeg * cosLat,
+    z:-(p[0]-lat0) * metersPerDeg,
+    alt:p[2],
+    lat:p[0],
+    lon:p[1]
+  }));
+  const maxHorizontal = Math.max(1, ...raw.map(p => Math.hypot(p.x, p.z)));
+  const hScale = 18 / maxHorizontal;
+  const altRange = Math.max(1, altMax - altMin);
+  const yScale = 7 / altRange;
+  const converter = (lat, lon, alt) => new THREE.Vector3(
+    (lon-lon0) * metersPerDeg * cosLat * hScale,
+    0.65 + (alt - altMin) * yScale,
+    -(lat-lat0) * metersPerDeg * hScale
+  );
+  spaceView.converter = converter;
+
+  const grid = new THREE.GridHelper(26, 26, 0x5b8a9a, 0x263443);
+  grid.material.transparent = true;
+  grid.material.opacity = 0.38;
+  group.add(grid);
+
+  const renderPoints = getSmoothedRenderPoints(FLIGHT);
+  const sampleStep = Math.max(1, Math.ceil(renderPoints.length / 900));
+  const sampled = renderPoints.filter((_,i)=>i % sampleStep === 0 || i === renderPoints.length-1);
+  const pts = sampled.map(p => converter(p[0], p[1], p[2]));
+
+  for (let i=0; i<pts.length-1; i++){
+    const casing = makeCylinderBetween(pts[i], pts[i+1], 0.085, 0x0c111a, 0.78);
+    if (casing) group.add(casing);
+  }
+  for (let i=0; i<pts.length-1; i++){
+    const avgAlt = (sampled[i][2] + sampled[i+1][2]) / 2;
+    const seg = makeCylinderBetween(pts[i], pts[i+1], 0.048, new THREE.Color(altColor(avgAlt)), 1);
+    if (seg) group.add(seg);
+  }
+
+  const postMat = new THREE.LineBasicMaterial({ color:0x8fa4aa, transparent:true, opacity:0.24 });
+  for (let i=0; i<pts.length; i += Math.max(8, Math.floor(pts.length / 45))){
+    const p = pts[i];
+    const geom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p.x,0,p.z), p]);
+    group.add(new THREE.Line(geom, postMat));
+  }
+
+  const start = pts[0];
+  const end = pts[pts.length-1];
+  const startDot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 16, 16),
+    new THREE.MeshStandardMaterial({ color:0x5b8a9a })
+  );
+  startDot.position.copy(start);
+  group.add(startDot);
+
+  const aircraft = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 24, 24),
+    new THREE.MeshStandardMaterial({ color:0xe8a04c, emissive:0x2b1903, roughness:0.35 })
+  );
+  aircraft.position.copy(end);
+  group.add(aircraft);
+  spaceView.aircraft = aircraft;
+  renderSpaceView();
+}
+
+function updateSpaceAircraft(lat, lon, alt){
+  if (!spaceView || !spaceView.aircraft || !spaceView.converter) return;
+  spaceView.aircraft.position.copy(spaceView.converter(lat, lon, alt));
+  renderSpaceView();
+}
 
 // ===========================================================================
 // Map themes
@@ -1360,6 +1636,37 @@ function clearTrack(){
   polylines = [];
   if (marker) { map.removeLayer(marker); marker = null; }
   trackBounds = null;
+  clearSpaceGroup();
+}
+
+function getRenderSubdivisions(a, b){
+  const distNm = haversineNM(a[0], a[1], b[0], b[1]);
+  const altDelta = Math.abs((b[2] || 0) - (a[2] || 0));
+  return Math.max(1, Math.min(10, Math.ceil(Math.max(distNm * 3, altDelta / 450))));
+}
+
+function interpolateFlightPoint(a, b, t){
+  return [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+    a[3] + ((b[3] ?? a[3]) - a[3]) * t,
+    a[4] + ((b[4] ?? a[4]) - a[4]) * t,
+    a[5]
+  ];
+}
+
+function getSmoothedRenderPoints(points){
+  if (points.length <= 1) return points.slice();
+  const smooth = [points[0]];
+  for (let i = 0; i < points.length - 1; i++){
+    const a = points[i], b = points[i + 1];
+    const steps = getRenderSubdivisions(a, b);
+    for (let s = 1; s <= steps; s++){
+      smooth.push(interpolateFlightPoint(a, b, s / steps));
+    }
+  }
+  return smooth;
 }
 
 function redrawTrackSegments(){
@@ -1368,7 +1675,8 @@ function redrawTrackSegments(){
   if (!FLIGHT.length) return;
 
   const theme = MAP_THEMES[currentMapTheme] || MAP_THEMES.dark;
-  const fullPath = FLIGHT.map(p => [p[0], p[1]]);
+  const renderPoints = getSmoothedRenderPoints(FLIGHT);
+  const fullPath = renderPoints.map(p => [p[0], p[1]]);
 
   // One continuous casing behind the color segments keeps the border solid.
   const casing = L.polyline(fullPath, {
@@ -1380,23 +1688,27 @@ function redrawTrackSegments(){
   }).addTo(map);
   polylines.push(casing);
 
-  // Colored altitude segments sit on top of the casing.
-  for (let i = 0; i < FLIGHT.length - 1; i++){
-    const a = FLIGHT[i], b = FLIGHT[i+1];
-    const avgAlt = (a[2]+b[2])/2;
-    const latlngs = [[a[0],a[1]],[b[0],b[1]]];
+  // Draw shorter interpolated segments so the altitude color changes feel smoother.
+  for (let i = 0; i < renderPoints.length - 1; i++){
+    const a = renderPoints[i], b = renderPoints[i+1];
+    const avgAlt = (a[2] + b[2]) / 2;
+    const latlngs = [[a[0], a[1]], [b[0], b[1]]];
 
     const line = L.polyline(latlngs, {
       color: altColor(avgAlt),
       weight: 4,
       opacity: 0.96,
-      lineCap: 'butt',
+      lineCap: 'round',
       lineJoin: 'round'
     }).addTo(map);
     polylines.push(line);
   }
 }
 function fitTrackToView(){
+  if (currentViewMode === 'space') {
+    resetSpaceCamera();
+    return;
+  }
   if (!trackBounds) return;
   map.invalidateSize();
   map.fitBounds(trackBounds, {
@@ -1464,6 +1776,7 @@ function renderTrack(points, tailNumber){
   document.getElementById('fit-track').classList.add('visible');
   document.getElementById('export-bar').classList.add('visible');
 
+  if (currentViewMode === 'space') buildSpaceTrack();
   update(0);
 }
 
@@ -1486,7 +1799,8 @@ function update(idx){
   const p = FLIGHT[idx];
   const [lat, lon, alt, speed, course, ts] = p;
 
-  marker.setLatLng([lat, lon]);
+  if (marker) marker.setLatLng([lat, lon]);
+  updateSpaceAircraft(lat, lon, alt);
 
   const timeStr = ts.split('T')[1].replace('Z','').split('.')[0];
   document.getElementById('r-time').textContent = timeStr;
