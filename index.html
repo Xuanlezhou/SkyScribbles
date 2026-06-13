@@ -1243,17 +1243,17 @@ function buildSpaceTrack(){
   grid.material.opacity = 0.38;
   group.add(grid);
 
-  const sampleStep = Math.max(1, Math.ceil(FLIGHT.length / 600));
-  const pts = FLIGHT.filter((_,i)=>i % sampleStep === 0 || i === FLIGHT.length-1)
-    .map(p => converter(p[0], p[1], p[2]));
+  // 3D view: render every point from the source data.
+  // Previously this was capped to ~600 displayed points with sampleStep,
+  // which made long tracks look like only every 10th point was mapped.
+  const pts = FLIGHT.map(p => converter(p[0], p[1], p[2]));
 
   for (let i=0; i<pts.length-1; i++){
     const casing = makeCylinderBetween(pts[i], pts[i+1], 0.085, 0x0c111a, 0.78);
     if (casing) group.add(casing);
   }
   for (let i=0; i<pts.length-1; i++){
-    const srcIndex = Math.min(FLIGHT.length-1, i * sampleStep);
-    const avgAlt = (FLIGHT[srcIndex][2] + FLIGHT[Math.min(FLIGHT.length-1, srcIndex+sampleStep)][2]) / 2;
+    const avgAlt = (FLIGHT[i][2] + FLIGHT[i+1][2]) / 2;
     const seg = makeCylinderBetween(pts[i], pts[i+1], 0.048, new THREE.Color(altColor(avgAlt)), 1);
     if (seg) group.add(seg);
   }
