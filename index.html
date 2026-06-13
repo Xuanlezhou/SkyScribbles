@@ -1248,10 +1248,8 @@ function buildSpaceTrack(){
   // which made long tracks look like only every 10th point was mapped.
   const pts = FLIGHT.map(p => converter(p[0], p[1], p[2]));
 
-  for (let i=0; i<pts.length-1; i++){
-    const casing = makeCylinderBetween(pts[i], pts[i+1], 0.085, 0x0c111a, 0.78);
-    if (casing) group.add(casing);
-  }
+  // Draw only the altitude-colored track segments.
+  // No casing cylinders: this keeps the 3D view lighter while still using every data point.
   for (let i=0; i<pts.length-1; i++){
     const avgAlt = (FLIGHT[i][2] + FLIGHT[i+1][2]) / 2;
     const seg = makeCylinderBetween(pts[i], pts[i+1], 0.048, new THREE.Color(altColor(avgAlt)), 1);
